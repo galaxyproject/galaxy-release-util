@@ -1,0 +1,30 @@
+# Python virtualenv
+.venv
+.venv3
+
+# Python build artifacts
+build
+dist
+lib/galaxy.egg-info
+.eggs
+
+# Python bytecode
+*.pyc
+
+# Test output
+.pytest_cache/
+.coverage
+htmlcov
+.tox
+
+# Project files
+*.kpf
+.idea
+.vscode
+.pre-commit-config.yaml
+
+# Misc
+*.orig
+.DS_Store
+*.rej
+*~
