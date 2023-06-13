@@ -13,9 +13,7 @@ from packaging.version import Version
 
 galaxy_root_option = click.option(
     "--galaxy-root",
-    type=click.Path(
-        exists=True, file_okay=False, resolve_path=True, path_type=pathlib.Path
-    ),
+    type=click.Path(exists=True, file_okay=False, resolve_path=True, path_type=pathlib.Path),
     default=".",
 )
 
@@ -32,12 +30,8 @@ def group_options(*options):
 class ClickVersion(click.ParamType):
     name = "pep440 version"
 
-    def convert(
-        self, value: Any, param: Optional[Parameter], ctx: Optional[Context]
-    ) -> Version:
+    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> Version:
         try:
             return Version(value)
         except Exception as e:
-            self.fail(
-                f"{value!r} is not a valid PEP440 version number: {str(e)}", param, ctx
-            )
+            self.fail(f"{value!r} is not a valid PEP440 version number: {str(e)}", param, ctx)

@@ -321,9 +321,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 release_version_argument = click.argument("release-version", type=ClickVersion())
 
 
-@click.group(
-    help="Subcommands of this script can perform various tasks around creating Galaxy releases"
-)
+@click.group(help="Subcommands of this script can perform various tasks around creating Galaxy releases")
 def cli():
     pass
 
@@ -341,9 +339,7 @@ def create_release_issue(release_version: Version, galaxy_root: Path):
         previous_version=previous_release,
         freeze_date=freeze_date,
     )
-    release_issue_contents = RELEASE_ISSUE_TEMPLATE.safe_substitute(
-        **release_issue_template_params
-    )
+    release_issue_contents = RELEASE_ISSUE_TEMPLATE.safe_substitute(**release_issue_template_params)
     github = github_client()
     repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
     release_issue = repo.create_issue(
@@ -357,14 +353,10 @@ def create_release_issue(release_version: Version, galaxy_root: Path):
 @group_options(release_version_argument, galaxy_root_option)
 def create_changelog(release_version: Version, galaxy_root: Path):
     release_file = _release_file(galaxy_root, str(release_version) + ".rst")
-    enhancement_targets = "\n\n".join(
-        f".. enhancement_tag_{a}" for a in GROUPED_TAGS.values()
-    )
+    enhancement_targets = "\n\n".join(f".. enhancement_tag_{a}" for a in GROUPED_TAGS.values())
     bug_targets = "\n\n".join(f".. bug_tag_{a}" for a in GROUPED_TAGS.values())
     template = TEMPLATE
-    template = template.replace(
-        ".. enhancement", f"{enhancement_targets}\n\n.. enhancement"
-    )
+    template = template.replace(".. enhancement", f"{enhancement_targets}\n\n.. enhancement")
     template = template.replace(".. bug", f"{bug_targets}\n\n.. bug")
     release_info = string.Template(template).safe_substitute(release=release_version)
     _write_file(release_file, release_info, skip_if_exists=True)
@@ -372,18 +364,12 @@ def create_changelog(release_version: Version, galaxy_root: Path):
     month_name = calendar.month_name[month]
     year = release_version.major
 
-    announce_info = ANNOUNCE_TEMPLATE.substitute(
-        month_name=month_name, year=year, release=release_version
-    )
+    announce_info = ANNOUNCE_TEMPLATE.substitute(month_name=month_name, year=year, release=release_version)
     announce_file = _release_file(galaxy_root, str(release_version) + "_announce.rst")
     _write_file(announce_file, announce_info, skip_if_exists=True)
 
-    announce_user_info = ANNOUNCE_USER_TEMPLATE.substitute(
-        month_name=month_name, year=year, release=release_version
-    )
-    announce_user_file = _release_file(
-        galaxy_root, str(release_version) + "_announce_user.rst"
-    )
+    announce_user_info = ANNOUNCE_USER_TEMPLATE.substitute(month_name=month_name, year=year, release=release_version)
+    announce_user_file = _release_file(galaxy_root, str(release_version) + "_announce_user.rst")
     _write_file(announce_user_file, announce_user_info, skip_if_exists=True)
 
     prs_file = _release_file(galaxy_root, str(release_version) + "_prs.rst")

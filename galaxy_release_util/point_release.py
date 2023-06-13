@@ -110,17 +110,13 @@ class Package:
         self.modified_paths.append(self.history_rst)
 
     def __repr__(self) -> str:
-        pretty_string = (
-            f"[Package: {self.name}, Current Version: {self.current_version}"
-        )
+        pretty_string = f"[Package: {self.name}, Current Version: {self.current_version}"
         return pretty_string
 
 
 def get_sorted_package_paths(galaxy_root: pathlib.Path) -> List[pathlib.Path]:
     root_package_path = galaxy_root.joinpath("packages")
-    sorted_packages = (
-        root_package_path.joinpath("packages_by_dep_dag.txt").read_text().splitlines()
-    )
+    sorted_packages = root_package_path.joinpath("packages_by_dep_dag.txt").read_text().splitlines()
     # Check that all packages are listed in packages_by_dep_dag.txt ?
     return [root_package_path.joinpath(package) for package in sorted_packages]
 
@@ -174,19 +170,14 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                 elif changelog_item.tagname == "section":
                     kind = changelog_item[0].astext()
                     section_delimiter = "=" * len(kind)
-                    changes.append(
-                        f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n"
-                    )
+                    changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
                     for section_changelog_item in changelog_item[1:]:
                         for child in section_changelog_item:
                             changes.append(f"* {child.rawsource.strip()}")
-            changelog_items.append(
-                ChangelogItem(
-                    version=current_version, date=current_date, changes=changes
-                )
-            )
+            changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
 
-    # Filter out dev release versions without changelog, we're going to add these back after committing the release version
+    # Filter out dev release versions without changelog,
+    # we're going to add these back after committing the release version
     clean_changelog_items: List[ChangelogItem] = []
     for item in changelog_items:
         if not item.is_empty_devrelease:
@@ -214,9 +205,7 @@ def bump_package_version(package: Package, new_version: Version):
 
 
 def get_commits_since_last_version(package: Package, last_version_tag: str):
-    click.echo(
-        f"finding commits to package {package.name} made since {last_version_tag}"
-    )
+    click.echo(f"finding commits to package {package.name} made since {last_version_tag}")
     package_source_paths = []
     commits = set()
     for code_dir in ["galaxy", "tests", "galaxy_test"]:
@@ -293,17 +282,13 @@ def update_package_history(package: Package, new_version: Version):
     for kind, entries in changes.items():
         if entries:
             section_delimiter = "=" * len(kind)
-            sorted_and_formatted_changes.append(
-                f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n"
-            )
+            sorted_and_formatted_changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
         sorted_and_formatted_changes.extend(entries)
 
     now = datetime.datetime.now().strftime("%Y-%m-%d")
     package.package_history.insert(
         0,
-        ChangelogItem(
-            version=new_version, changes=sorted_and_formatted_changes, date=now
-        ),
+        ChangelogItem(version=new_version, changes=sorted_and_formatted_changes, date=now),
     )
     package.write_history()
 
@@ -321,10 +306,7 @@ def upload_package(package: Package):
     click.echo(f"uploading package {package.name}")
     subprocess.run(
         ["twine", "upload", "--skip-existing"]
-        + [
-            str(artifact_path)
-            for artifact_path in package.path.joinpath("dist").glob("*")
-        ],
+        + [str(artifact_path) for artifact_path in package.path.joinpath("dist").glob("*")],
         cwd=package.path,
     ).check_returncode()
 
@@ -340,9 +322,7 @@ def get_root_version(galaxy_root: pathlib.Path) -> Version:
 
 def set_root_version(galaxy_root: pathlib.Path, new_version: Version) -> pathlib.Path:
     major_galaxy_release_string = f"{new_version.major}.{new_version.minor}"
-    minor_galaxy_release_string = str(new_version).replace(
-        f"{major_galaxy_release_string}.", ""
-    )
+    minor_galaxy_release_string = str(new_version).replace(f"{major_galaxy_release_string}.", "")
     VERSION_PY_TEMPLATE = f"""VERSION_MAJOR = "{major_galaxy_release_string}"
 VERSION_MINOR = "{minor_galaxy_release_string}"
 VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
@@ -368,9 +348,7 @@ def is_git_clean(galaxy_root: pathlib.Path):
 
 def get_current_branch(galaxy_root):
     current_branch_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
-    result = subprocess.run(
-        current_branch_cmd, cwd=galaxy_root, capture_output=True, text=True
-    )
+    result = subprocess.run(current_branch_cmd, cwd=galaxy_root, capture_output=True, text=True)
     result.check_returncode()
     return result.stdout.strip()
 
@@ -429,18 +407,11 @@ def merge_and_resolve_branches(
     # we rewrite the packages changelog
     for new_package in packages_to_rewrite:
         previous_package = package_paths[new_package.path]
-        combined_history = (
-            previous_package.package_history + new_package.package_history
-        )
+        combined_history = previous_package.package_history + new_package.package_history
         new_history: List[ChangelogItem] = []
         last_changelog_item: Optional[ChangelogItem] = None
-        for changelog_item in sorted(
-            combined_history, key=lambda item: item.version, reverse=True
-        ):
-            if (
-                last_changelog_item
-                and changelog_item.version == last_changelog_item.version
-            ):
+        for changelog_item in sorted(combined_history, key=lambda item: item.version, reverse=True):
+            if last_changelog_item and changelog_item.version == last_changelog_item.version:
                 assert (
                     last_changelog_item.changes == changelog_item.changes
                 ), f"Changelog differs for version {changelog_item.version} of package {new_package.name}, you have to fix this manually.\nOffending lines are {last_changelog_item.changes} and {changelog_item.changes}"
@@ -457,15 +428,11 @@ def merge_and_resolve_branches(
             reverse=True,
         )
         dev_version = get_root_version(galaxy_root)
-        previous_package.package_history.insert(
-            0, ChangelogItem(version=dev_version, changes=[], date=None)
-        )
+        previous_package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
         previous_package.write_history()
         subprocess.run(["git", "add", str(previous_package.history_rst)])
         # restore setup.cfg
-        subprocess.run(
-            ["git", "checkout", new_branch, str(previous_package.setup_cfg)]
-        ).check_returncode()
+        subprocess.run(["git", "checkout", new_branch, str(previous_package.setup_cfg)]).check_returncode()
     # Commit changes
     if merge_conflict:
         subprocess.run(["git", "commit", "--no-edit"]).check_returncode()
@@ -483,9 +450,7 @@ def get_next_devN_version(galaxy_root) -> Version:
         minor_version = root_version.minor
         micro_version = root_version.micro + 1
         dev_version = 0
-    return Version(
-        f"{root_version.major}.{minor_version}.{micro_version}.dev{dev_version}"
-    )
+    return Version(f"{root_version.major}.{minor_version}.{micro_version}.dev{dev_version}")
 
 
 def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Path):
@@ -501,9 +466,7 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
     return True
 
 
-def ensure_branches_up_to_date(
-    branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path
-):
+def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
     for branch in branches:
         subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
         # Check that the head commit matches the commit for the same branch at the specified remote repo url
@@ -514,9 +477,7 @@ def ensure_branches_up_to_date(
         )
         result.check_returncode()
         remote_commit_hash = result.stdout.split("\t")[0]
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"], capture_output=True, text=True
-        )
+        result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
         result.check_returncode()
         local_commit_hash = result.stdout.strip()
         if remote_commit_hash != local_commit_hash:
@@ -526,16 +487,12 @@ def ensure_branches_up_to_date(
     subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
-def push_references(
-    references: List[str], upstream: str = "https://github.com/galaxyproject/galaxy.git"
-):
+def push_references(references: List[str], upstream: str = "https://github.com/galaxyproject/galaxy.git"):
     for reference in references:
         subprocess.run(["git", "push", upstream, reference]).check_returncode()
 
 
-@click.group(
-    help="Subcommands of this script can create new releases and build and upload package artifacts"
-)
+@click.group(help="Subcommands of this script can create new releases and build and upload package artifacts")
 def cli():
     pass
 
@@ -585,9 +542,7 @@ def build_and_upload(
     type=str,
     help="Specify commit or tag that was used for the last package release. This is used to find the changelog for packages.",
 )
-@click.option(
-    "--build-packages/--no-build-packages", type=bool, is_flag=True, default=True
-)
+@click.option("--build-packages/--no-build-packages", type=bool, is_flag=True, default=True)
 @click.option("--upload-packages", type=bool, is_flag=True, default=False)
 @click.option("--upstream", type=str, default=DEFAULT_UPSTREAM_URL)
 @group_options(packages_option, no_confirm_option)
@@ -608,9 +563,7 @@ def create_point_release(
             abort=True,
         )
     root_version = get_root_version(galaxy_root)
-    click.echo(
-        f"Current Galaxy version is {root_version}, will create new version {new_version}"
-    )
+    click.echo(f"Current Galaxy version is {root_version}, will create new version {new_version}")
     if not no_confirm:
         click.confirm("Does this look correct?", abort=True)
     base_branch = current_branch = get_current_branch(galaxy_root)
@@ -621,9 +574,7 @@ def create_point_release(
 
     click.echo("Making sure that merging forward will result in clean merges")
     for new_branch in newer_branches:
-        merge_required = is_merge_required(
-            base_branch=current_branch, new_branch=new_branch, galaxy_root=galaxy_root
-        )
+        merge_required = is_merge_required(base_branch=current_branch, new_branch=new_branch, galaxy_root=galaxy_root)
         if merge_required:
             msg = f"Merge conflicts occurred while attempting to merge branch {current_branch} into {new_branch}. You should resolve conflicts and try again."
             if no_confirm:
@@ -659,11 +610,7 @@ def create_point_release(
         cmd = ["git", "diff"]
         cmd.extend([str(p) for p in modified_paths])
         subprocess.run(cmd, cwd=galaxy_root)
-    if (
-        build_packages
-        and upload_packages
-        and (no_confirm or click.confirm("Upload packages to ?"))
-    ):
+    if build_packages and upload_packages and (no_confirm or click.confirm("Upload packages to ?")):
         for package in packages:
             upload_package(package)
     # stage changes, commit and tag
@@ -683,9 +630,7 @@ def create_point_release(
     modified_paths = [version_py]
     for package in packages:
         bump_package_version(package, dev_version)
-        package.package_history.insert(
-            0, ChangelogItem(version=dev_version, changes=[], date=None)
-        )
+        package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
         package.write_history()
         modified_paths.extend(package.modified_paths)
     cmd = ["git", "add"]
@@ -705,9 +650,7 @@ def create_point_release(
         merge_and_resolve_branches(galaxy_root, current_branch, new_branch, packages)
         current_branch = new_branch
     references = [release_tag] + all_branches
-    if no_confirm or click.confirm(
-        f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True
-    ):
+    if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
         push_references(references=references, upstream=upstream)
 
 

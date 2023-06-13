@@ -2,8 +2,9 @@
 -r test-requirements.txt
 
 # For dev
-sphinx
 mypy
+ruff
+black
 
 # For release
 build
