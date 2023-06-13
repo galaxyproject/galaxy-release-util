@@ -1,0 +1,27 @@
+name: Deploy to PyPI
+on:
+  release:
+    types: [released]
+jobs:
+  pypi-publish:
+    if: github.repository_owner == 'mvdbeek'
+    name: Upload release to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/galaxy-release-util
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - uses: actions/checkout@v3
+    - name: Install build dependencies
+      run: pip install build twine
+    - name: Build package
+      run: python -m build
+    - name: twine check
+      run: twine check dist/*
+    - name: Publish package distributions to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
