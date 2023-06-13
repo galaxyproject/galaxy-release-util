@@ -146,7 +146,7 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
     assert root_section.tagname == "section"
     for release in root_section.children:
         # ignore title and comment
-        assert isinstance(release, docutils.nodes.title)
+        assert isinstance(release, docutils.nodes.Element), release
         if release.tagname == "section":
             assert release[0].tagname == "title"
             release_version = release[0].astext()
