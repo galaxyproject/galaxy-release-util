@@ -208,6 +208,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           make release-check-blocking-prs
 
+    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``galaxy/model/migrations/dbscript.py``.
+
     - [ ] Merge the latest release into dev and push upstream.
 
           make release-merge-stable-to-next RELEASE_PREVIOUS=release_${previous_version}
