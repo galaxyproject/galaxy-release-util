@@ -252,9 +252,6 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Checkout release branch
 
           git checkout release_${version} -b ${version}_release_notes
-    - [ ] Check for obvious missing metadata in release PRs
-
-          make release-check-metadata RELEASE_CURR=${version}
     - [ ] Bootstrap the release notes
 
           make release-bootstrap-history RELEASE_CURR=${version}
