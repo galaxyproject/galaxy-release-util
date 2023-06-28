@@ -241,7 +241,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Update testtoolshed.g2.bx.psu.edu to ensure it is running a dev at or past branch point (${freeze_date} + 1 day).
     - [ ] Deploy to usegalaxy.org (${freeze_date} + 1 week).
     - [ ] Deploy to toolshed.g2.bx.psu.edu (${freeze_date} + 1 week).
-    - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/commit/b74b1c302a1b8fed86786b40d7ecc3520cbadcd3) to include a ``release_${version}`` target: add ``- TOX_ENV=py27 GALAXY_VERSION=release_${version}`` to the ``env`` list in ``.travis.yml`` .
+    - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
     - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
         - [ ] https://github.com/galaxyproject/tools-iuc/blob/master/.github/workflows/
         - [ ] https://github.com/galaxyproject/tools-devteam/blob/master/.github/workflows/
