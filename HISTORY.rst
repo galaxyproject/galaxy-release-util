@@ -3,6 +3,14 @@ History
 
 .. to_doc
 
+
+
+------------------
+0.1.3 (28-06-2023)
+------------------
+* Add step/checkbox on updating db revision identifier
+* Bootstrap history fixes
+
 ------------------
 0.1.2 (12-06-2023)
 ------------------
