@@ -6,6 +6,11 @@ History
 
 
 ------------------
+0.1.4 (30-06-2023)
+------------------
+* Skip empty prerelease changelog when parsing changelog
+
+------------------
 0.1.3 (28-06-2023)
 ------------------
 * Add step/checkbox on updating db revision identifier
