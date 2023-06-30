@@ -63,7 +63,7 @@ class ChangelogItem:
 
     @property
     def is_empty_devrelease(self):
-        return self.version.is_devrelease and not self.changes
+        return (self.version.is_devrelease or self.version.is_prerelease) and not self.changes
 
     def __str__(self) -> str:
         change_lines = "\n".join(self.changes)
