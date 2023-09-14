@@ -375,7 +375,7 @@ def create_changelog(release_version: Version, galaxy_root: Path):
     seen_prs = set()
     try:
         with open(prs_file) as fh:
-            seen_prs = set(map(int, re.findall(r"\.\. _Pull Request (\d*): https", fh.read())))
+            seen_prs = set(map(int, re.findall(r"\.\. _Pull Request (\d+): https", fh.read())))
     except FileNotFoundError:
         pass
     _write_file(prs_file, PRS_TEMPLATE, skip_if_exists=True)
