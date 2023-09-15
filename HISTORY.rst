@@ -6,6 +6,11 @@ History
 
 
 ------------------
+0.1.5 (14-09-2023)
+------------------
+* Bootstrap history fixes for regenerating existing docs
+
+------------------
 0.1.4 (30-06-2023)
 ------------------
 * Skip empty prerelease changelog when parsing changelog
