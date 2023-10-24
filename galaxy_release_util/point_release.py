@@ -253,7 +253,8 @@ def commits_to_prs(packages: List[Package]):
                 pr_cache[pr.number] = pr
             commit_to_pr[commit] = pr_cache[pr.number]
     for package in packages:
-        package.prs = set(commit_to_pr[commit] for commit in package.commits)
+        # Exclude commits without PRs
+        package.prs = set(commit_to_pr[commit] for commit in package.commits if commit in commit_to_pr)
 
 
 def update_package_history(package: Package, new_version: Version):
