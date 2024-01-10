@@ -94,7 +94,7 @@ Highlights
 Also check out the `${release} user release notes <${release}_announce_user.html>`__
 
 Get Galaxy
-==========
+===========================================================
 
 The code lives at `GitHub <https://github.com/galaxyproject/galaxy>`__ and you should have `Git <https://git-scm.com/>`__ to obtain it.
 
@@ -109,6 +109,19 @@ To update an existing Galaxy repository run:
       $$ git fetch origin && git checkout release_${release} && git pull --ff-only origin release_${release}
 
 See the `community hub <https://galaxyproject.org/develop/source-code/>`__ for additional details on source code locations.
+
+
+Administration Notes
+===========================================================
+Add content or drop section.
+
+Configuration Changes
+===========================================================
+Add content or drop section.
+
+Deprecation Notices
+===========================================================
+Add content or drop section.
 
 Release Notes
 ===========================================================
