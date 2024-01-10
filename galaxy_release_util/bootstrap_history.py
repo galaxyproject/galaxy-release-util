@@ -481,7 +481,7 @@ def _get_prs(release_version: str, state="closed"):
         if reached_old_prs:
             break
 
-        if pr.created_at < datetime.datetime(2020, 5, 1, 0, 0):
+        if pr.created_at.replace(tzinfo=None) < datetime.datetime(2020, 5, 1, 0, 0):
             reached_old_prs = True
             pass
         merged_at = pr.merged_at
