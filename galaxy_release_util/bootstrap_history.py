@@ -82,14 +82,20 @@ ${month_name} 20${year} Galaxy Release (v ${release})
 Highlights
 ===========================================================
 
-**Feature1**
-  Feature description.
+Feature1
+--------
 
-**Feature2**
-  Feature description.
+Feature description.
 
-**Feature3**
-  Feature description.
+Feature2
+--------
+
+Feature description.
+
+Feature3
+--------
+
+Feature description.
 
 Also check out the `${release} user release notes <${release}_announce_user.html>`__
 
@@ -144,14 +150,20 @@ ${month_name} 20${year} Galaxy Release (v ${release})
 Highlights
 ===========================================================
 
-**Feature1**
-  Feature description.
+Feature1
+--------
 
-**Feature2**
-  Feature description.
+Feature description.
 
-**Feature3**
-  Feature description.
+Feature2
+--------
+
+Feature description.
+
+Feature3
+--------
+
+Feature description.
 
 
 New Visualizations
