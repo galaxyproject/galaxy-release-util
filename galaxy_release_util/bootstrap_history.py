@@ -154,12 +154,12 @@ Highlights
   Feature description.
 
 
-New Visualizations
+Visualizations
 ===========================================================
 
 .. visualizations
 
-New Datatypes
+Datatypes
 ===========================================================
 
 .. datatypes
