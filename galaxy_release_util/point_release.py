@@ -117,8 +117,8 @@ class Package:
 def get_sorted_package_paths(galaxy_root: pathlib.Path) -> List[pathlib.Path]:
     root_package_path = galaxy_root.joinpath("packages")
     sorted_packages = root_package_path.joinpath("packages_by_dep_dag.txt").read_text().splitlines()
-    # Check that all packages are listed in packages_by_dep_dag.txt ?
-    return [root_package_path.joinpath(package) for package in sorted_packages]
+    # Ignore empty lines and lines beginning with "#"
+    return [root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")]
 
 
 def read_package(package_path: pathlib.Path) -> Package:
