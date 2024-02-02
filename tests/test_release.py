@@ -1,3 +1,5 @@
+import pathlib
+
 import pytest
 
 from galaxy_release_util.point_release import (
@@ -20,32 +22,16 @@ baz
 """
 
 
-@pytest.fixture(scope="session")
-def make_version_file():
-    def f(root):
-        file = root / "lib" / "galaxy" / "version.py"
-        file.parent.mkdir(parents=True)
-        file.write_text(VERSION_PY_CONTENTS)
-
-    return f
+def write_contents(path: pathlib.Path, contents: str):
+    path.parent.mkdir(parents=True)
+    path.write_text(contents)
 
 
-@pytest.fixture(scope="session")
-def make_packages_file():
-    def f(root):
-        file = root / "packages" / "packages_by_dep_dag.txt"
-        file.parent.mkdir(parents=True)
-        file.write_text(PACKAGES_BY_DEP_DAG_CONTENTS)
-
-    return f
-
-
-@pytest.fixture(scope="session")
-def galaxy_root(tmp_path_factory, make_version_file, make_packages_file):
-    tmp_root = tmp_path_factory.mktemp("galaxy_root")
-    make_version_file(tmp_root)
-    make_packages_file(tmp_root)
-    return tmp_root
+@pytest.fixture()
+def galaxy_root(tmp_path: pathlib.Path):
+    write_contents(tmp_path / "lib" / "galaxy" / "version.py", VERSION_PY_CONTENTS)
+    write_contents(tmp_path / "packages" / "packages_by_dep_dag.txt", PACKAGES_BY_DEP_DAG_CONTENTS)
+    return tmp_path
 
 
 def test_get_root_version(galaxy_root):
