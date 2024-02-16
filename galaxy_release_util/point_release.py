@@ -164,7 +164,8 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                 # could be bullet list or a nested section with bugfix, docs, etc
                 if changelog_item.tagname == "bullet_list":
                     for child in changelog_item.children:
-                        changes.append(f"* {child.rawsource.strip()}")
+                        if rawsource := child.rawsource.strip() and not rawsource.startswith("First release"):
+                            changes.append(f"* {rawsource}")
                 elif changelog_item.tagname == "paragraph":
                     changes = changelog_item.rawsource.splitlines()
                 elif changelog_item.tagname == "section":
@@ -173,7 +174,8 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                     changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
                     for section_changelog_item in changelog_item[1:]:
                         for child in section_changelog_item:
-                            changes.append(f"* {child.rawsource.strip()}")
+                            if rawsource := child.rawsource.strip() and not rawsource.startswith("First release"):
+                                changes.append(f"* {rawsource}")
             changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
 
     # Filter out dev release versions without changelog,
