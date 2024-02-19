@@ -462,9 +462,10 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
     process = subprocess.run(
         ["git", "merge", "--no-commit", "--no-ff", base_branch],
         cwd=galaxy_root,
-        capture_output=False,
+        capture_output=True,
     )
-    subprocess.run(["git", "merge", "--abort"], cwd=galaxy_root)
+    if not process.stdout == b"Already up to date.\n":
+        subprocess.run(["git", "merge", "--abort"], cwd=galaxy_root)
     if process.returncode == 0:
         return False
     return True
