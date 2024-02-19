@@ -334,7 +334,7 @@ VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
 
 
 def is_git_clean(galaxy_root: pathlib.Path):
-    click.echo(f"Making sure galaxy clone at '{galaxy_root}' is clean")
+    click.echo(f"Making sure galaxy clone at '{galaxy_root}' is clean:")
     command = ["git", "diff-index", "--quiet", "HEAD"]
     result = subprocess.run(command, capture_output=True, text=True, cwd=galaxy_root)
     if result.returncode == 0:
@@ -571,10 +571,12 @@ def create_point_release(
             abort=True,
         )
     root_version = get_root_version(galaxy_root)
-    click.echo(f"Current Galaxy version is {root_version}, will create new version {new_version}")
+    base_branch = current_branch = get_current_branch(galaxy_root)
+    click.echo(
+        f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
+    )
     if not no_confirm:
         click.confirm("Does this look correct?", abort=True)
-    base_branch = current_branch = get_current_branch(galaxy_root)
     newer_branches = get_branches(galaxy_root, new_version, base_branch)
     all_branches = newer_branches + [base_branch]
     click.echo("Making sure that all branches are up to date")
