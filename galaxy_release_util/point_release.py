@@ -403,7 +403,8 @@ def merge_and_resolve_branches(
             "checkout",
             new_branch,
             str(galaxy_root / "lib" / "galaxy" / "version.py"),
-        ]
+        ],
+        cwd=galaxy_root,
     )
     # we rewrite the packages changelog
     for new_package in packages_to_rewrite:
@@ -431,14 +432,16 @@ def merge_and_resolve_branches(
         dev_version = get_root_version(galaxy_root)
         previous_package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
         previous_package.write_history()
-        subprocess.run(["git", "add", str(previous_package.history_rst)])
+        subprocess.run(["git", "add", str(previous_package.history_rst)], cwd=galaxy_root)
         # restore setup.cfg
-        subprocess.run(["git", "checkout", new_branch, str(previous_package.setup_cfg)]).check_returncode()
+        subprocess.run(
+            ["git", "checkout", new_branch, str(previous_package.setup_cfg)], cwd=galaxy_root
+        ).check_returncode()
     # Commit changes
     if merge_conflict:
-        subprocess.run(["git", "commit", "--no-edit"]).check_returncode()
+        subprocess.run(["git", "commit", "--no-edit"], cwd=galaxy_root).check_returncode()
     else:
-        subprocess.run(["git", "commit", "--amend", "--no-edit"]).check_returncode()
+        subprocess.run(["git", "commit", "--amend", "--no-edit"], cwd=galaxy_root).check_returncode()
 
 
 def get_next_devN_version(galaxy_root) -> Version:
@@ -473,12 +476,13 @@ def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: 
         # Check that the head commit matches the commit for the same branch at the specified remote repo url
         result = subprocess.run(
             ["git", "ls-remote", upstream, f"refs/heads/{branch}"],
+            cwd=galaxy_root,
             capture_output=True,
             text=True,
         )
         result.check_returncode()
         remote_commit_hash = result.stdout.split("\t")[0]
-        result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=galaxy_root, capture_output=True, text=True)
         result.check_returncode()
         local_commit_hash = result.stdout.strip()
         if remote_commit_hash != local_commit_hash:
@@ -488,9 +492,11 @@ def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: 
     subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
-def push_references(references: List[str], upstream: str = "https://github.com/galaxyproject/galaxy.git"):
+def push_references(
+    references: List[str], galaxy_root: pathlib.Path, upstream: str = "https://github.com/galaxyproject/galaxy.git"
+):
     for reference in references:
-        subprocess.run(["git", "push", upstream, reference]).check_returncode()
+        subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
 
 
 @click.group(help="Subcommands of this script can create new releases and build and upload package artifacts")
@@ -621,11 +627,11 @@ def create_point_release(
     cmd.extend(changed_paths)
     release_tag = f"v{new_version}"
     subprocess.run(cmd, cwd=galaxy_root)
-    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"])
+    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"], cwd=galaxy_root)
     if not no_confirm:
         click.confirm(f"Create git tag '{release_tag}'?", abort=True)
 
-    subprocess.run(["git", "tag", release_tag])
+    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
     dev_version = get_next_devN_version(galaxy_root)
     version_py = set_root_version(galaxy_root, dev_version)
     modified_paths = [version_py]
@@ -636,8 +642,8 @@ def create_point_release(
         modified_paths.extend(package.modified_paths)
     cmd = ["git", "add"]
     cmd.extend([str(p) for p in modified_paths])
-    subprocess.run(cmd)
-    subprocess.run(["git", "commit", "-m", f"Start work on {dev_version}"])
+    subprocess.run(cmd, cwd=galaxy_root)
+    subprocess.run(["git", "commit", "-m", f"Start work on {dev_version}"], cwd=galaxy_root)
     # merge changes into newer branches
     # special care needs to be taken for changelog files
     if not no_confirm and newer_branches:
@@ -652,7 +658,7 @@ def create_point_release(
         current_branch = new_branch
     references = [release_tag] + all_branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
-        push_references(references=references, upstream=upstream)
+        push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
 
 
 if __name__ == "__main__":
