@@ -242,9 +242,12 @@ def commits_to_prs(packages: List[Package]):
     commits = set.union(*(p.commits for p in packages))
     pr_cache = {}
     commit_to_pr = {}
-    for commit in commits:
+    repo = g.get_repo(REPO)
+    total_commits = len(commits)
+    for i, commit in enumerate(commits):
+        click.echo(f"Processing commit {i} of {total_commits}")
         # Get the list of pull requests associated with the commit
-        commit_obj = g.get_repo(REPO).get_commit(commit)
+        commit_obj = repo.get_commit(commit)
         prs = commit_obj.get_pulls()
         if not prs:
             raise Exception(f"commit {commit} has no associated PRs")
