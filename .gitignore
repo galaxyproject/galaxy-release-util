@@ -5,7 +5,7 @@
 # Python build artifacts
 build
 dist
-lib/galaxy.egg-info
+galaxy_release_util.egg-info
 .eggs
 
 # Python bytecode
