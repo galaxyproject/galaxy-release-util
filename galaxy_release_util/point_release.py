@@ -47,6 +47,13 @@ HISTORY_TEMPLATE = """History
 
 """
 RELEASE_BRANCH_REGEX = re.compile(r"^release_(\d{2}\.\d{1,2})$")
+FIRST_RELEASE_CHANGELOG_TEXT = "First release"
+
+
+@dataclass
+class ReleaseItem:
+    version: Version
+    date: Optional[str] = None
 
 
 @dataclass
@@ -87,6 +94,7 @@ class Package:
     prs: Set[PullRequest.PullRequest] = field(default_factory=set)
     modified_paths: List[pathlib.Path] = field(default_factory=list)
     package_history: List[ChangelogItem] = field(default_factory=list)
+    release_items: List[ReleaseItem] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -108,6 +116,22 @@ class Package:
     def write_history(self):
         self.history_rst.write_text(self.changelog)
         self.modified_paths.append(self.history_rst)
+
+    def add_release(self, item: ReleaseItem) -> None:
+        self.release_items.append(item)
+
+    @property
+    def is_new(self) -> bool:
+        """Package has not been released:
+        - has only one release item,
+        - which is a devrelease,
+        - and has no date.
+        """
+        return (
+            len(self.release_items) == 1
+            and self.release_items[0].version.is_devrelease
+            and not self.release_items[0].date
+        )
 
     def __repr__(self) -> str:
         pretty_string = f"[Package: {self.name}, Current Version: {self.current_version}"
@@ -137,6 +161,9 @@ def read_package(package_path: pathlib.Path) -> Package:
 
 
 def parse_changelog(package: Package) -> List[ChangelogItem]:
+    def add_changelog_item(changes, child):
+        changes.append(f"* {child.rawsource.strip()}")
+
     settings = frontend.get_default_settings(Parser)  # type: ignore[attr-defined] ## upstream type stubs not updated?
     document = utils.new_document(str(package.history_rst), settings)
     Parser().parse(package.history_rst.read_text(), document)
@@ -159,12 +186,13 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                 # we will just omit this later
                 version_str = release_version
             current_version = Version(version_str)
+            package.add_release(ReleaseItem(version=current_version, date=current_date))
             changes = []
             for changelog_item in release[1:]:
                 # could be bullet list or a nested section with bugfix, docs, etc
                 if changelog_item.tagname == "bullet_list":
                     for child in changelog_item.children:
-                        changes.append(f"* {child.rawsource.strip()}")
+                        add_changelog_item(changes, child)
                 elif changelog_item.tagname == "paragraph":
                     changes = changelog_item.rawsource.splitlines()
                 elif changelog_item.tagname == "section":
@@ -173,17 +201,17 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                     changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
                     for section_changelog_item in changelog_item[1:]:
                         for child in section_changelog_item:
-                            changes.append(f"* {child.rawsource.strip()}")
+                            add_changelog_item(changes, child)
             changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
 
     # Filter out dev release versions without changelog,
     # we're going to add these back after committing the release version
     clean_changelog_items: List[ChangelogItem] = []
     for item in changelog_items:
-        if not item.is_empty_devrelease:
+        if not (item.is_empty_devrelease or package.is_new):
             if item.date is None:
                 raise Exception(
-                    f"Error in '{package.history_rst}'. Changelog entry for version '{item.version}' has no date but contains changes. You have to fix this manually."
+                    f"Error in '{package.history_rst}'. Changelog entry for non-dev version '{item.version}' has no date but contains changes. You have to fix this manually."
                 )
             clean_changelog_items.append(item)
     return sorted(
@@ -267,7 +295,10 @@ def update_package_history(package: Package, new_version: Version):
         "Enhancements": [],
         "Other changes": [],
     }
-    if not package.prs:
+    if package.is_new:
+        # For new packages, replace any current text; do not list PRs.
+        sorted_and_formatted_changes.append(FIRST_RELEASE_CHANGELOG_TEXT)
+    elif not package.prs:
         # Skip publishing packages if no change ?
         sorted_and_formatted_changes.append("No recorded changes since last release")
     else:
