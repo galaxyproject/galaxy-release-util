@@ -162,7 +162,9 @@ def read_package(package_path: pathlib.Path) -> Package:
 
 def parse_changelog(package: Package) -> List[ChangelogItem]:
     def add_changelog_item(changes, child):
-        changes.append(f"* {child.rawsource.strip()}")
+        rawsource = child.rawsource.strip()
+        if rawsource:
+            changes.append(f"* {rawsource}")
 
     settings = frontend.get_default_settings(Parser)  # type: ignore[attr-defined] ## upstream type stubs not updated?
     document = utils.new_document(str(package.history_rst), settings)
