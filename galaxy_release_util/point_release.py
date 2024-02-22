@@ -172,13 +172,11 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
     changelog_items: List[ChangelogItem] = []
     root_section = document[0]
     assert isinstance(root_section, docutils.nodes.section)
-    assert root_section.tagname == "section"
-    for release in root_section.children:
+    for node in root_section.children:
         # ignore title and comment
-        assert isinstance(release, (docutils.nodes.title, docutils.nodes.comment, docutils.nodes.section)), release
-        if release.tagname == "section":
-            assert release[0].tagname == "title"
-            release_version = release[0].astext()
+        assert isinstance(node, (docutils.nodes.title, docutils.nodes.comment, docutils.nodes.section)), node
+        if isinstance(node, docutils.nodes.section):
+            release_version = node[0].astext()
             current_date = None
             if " (" in release_version:
                 version_str, current_date = release_version.split(" (")
@@ -189,19 +187,20 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                 version_str = release_version
             current_version = Version(version_str)
             package.add_release(ReleaseItem(version=current_version, date=current_date))
-            changes = []
-            for changelog_item in release[1:]:
+            changes: List = []
+            for changelog_item in node[1:]:
                 # could be bullet list or a nested section with bugfix, docs, etc
-                if changelog_item.tagname == "bullet_list":
+                if isinstance(changelog_item, docutils.nodes.bullet_list):
                     for child in changelog_item.children:
                         add_changelog_item(changes, child)
-                elif changelog_item.tagname == "paragraph":
+                elif isinstance(changelog_item, docutils.nodes.paragraph):
                     changes = changelog_item.rawsource.splitlines()
-                elif changelog_item.tagname == "section":
+                elif isinstance(changelog_item, docutils.nodes.section):
                     kind = changelog_item[0].astext()
                     section_delimiter = "=" * len(kind)
                     changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
                     for section_changelog_item in changelog_item[1:]:
+                        assert isinstance(section_changelog_item, docutils.nodes.bullet_list)
                         for child in section_changelog_item:
                             add_changelog_item(changes, child)
             changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
