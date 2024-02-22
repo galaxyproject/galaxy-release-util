@@ -47,6 +47,13 @@ HISTORY_TEMPLATE = """History
 
 """
 RELEASE_BRANCH_REGEX = re.compile(r"^release_(\d{2}\.\d{1,2})$")
+FIRST_RELEASE_CHANGELOG_TEXT = "First release"
+
+
+@dataclass
+class ReleaseItem:
+    version: Version
+    date: Optional[str] = None
 
 
 @dataclass
@@ -87,6 +94,7 @@ class Package:
     prs: Set[PullRequest.PullRequest] = field(default_factory=set)
     modified_paths: List[pathlib.Path] = field(default_factory=list)
     package_history: List[ChangelogItem] = field(default_factory=list)
+    release_items: List[ReleaseItem] = field(default_factory=list)
 
     @property
     def name(self) -> str:
@@ -108,6 +116,22 @@ class Package:
     def write_history(self):
         self.history_rst.write_text(self.changelog)
         self.modified_paths.append(self.history_rst)
+
+    def add_release(self, item: ReleaseItem) -> None:
+        self.release_items.append(item)
+
+    @property
+    def is_new(self) -> bool:
+        """Package has not been released:
+        - has only one release item,
+        - which is a devrelease,
+        - and has no date.
+        """
+        return (
+            len(self.release_items) == 1
+            and self.release_items[0].version.is_devrelease
+            and not self.release_items[0].date
+        )
 
     def __repr__(self) -> str:
         pretty_string = f"[Package: {self.name}, Current Version: {self.current_version}"
@@ -137,6 +161,11 @@ def read_package(package_path: pathlib.Path) -> Package:
 
 
 def parse_changelog(package: Package) -> List[ChangelogItem]:
+    def add_changelog_item(changes, child):
+        rawsource = child.rawsource.strip()
+        if rawsource:
+            changes.append(f"* {rawsource}")
+
     settings = frontend.get_default_settings(Parser)  # type: ignore[attr-defined] ## upstream type stubs not updated?
     document = utils.new_document(str(package.history_rst), settings)
     Parser().parse(package.history_rst.read_text(), document)
@@ -159,12 +188,13 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                 # we will just omit this later
                 version_str = release_version
             current_version = Version(version_str)
+            package.add_release(ReleaseItem(version=current_version, date=current_date))
             changes = []
             for changelog_item in release[1:]:
                 # could be bullet list or a nested section with bugfix, docs, etc
                 if changelog_item.tagname == "bullet_list":
                     for child in changelog_item.children:
-                        changes.append(f"* {child.rawsource.strip()}")
+                        add_changelog_item(changes, child)
                 elif changelog_item.tagname == "paragraph":
                     changes = changelog_item.rawsource.splitlines()
                 elif changelog_item.tagname == "section":
@@ -173,17 +203,17 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                     changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
                     for section_changelog_item in changelog_item[1:]:
                         for child in section_changelog_item:
-                            changes.append(f"* {child.rawsource.strip()}")
+                            add_changelog_item(changes, child)
             changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
 
     # Filter out dev release versions without changelog,
     # we're going to add these back after committing the release version
     clean_changelog_items: List[ChangelogItem] = []
     for item in changelog_items:
-        if not item.is_empty_devrelease:
+        if not (item.is_empty_devrelease or package.is_new):
             if item.date is None:
                 raise Exception(
-                    f"Error in '{package.history_rst}'. Changelog entry for version '{item.version}' has no date but contains changes. You have to fix this manually."
+                    f"Error in '{package.history_rst}'. Changelog entry for non-dev version '{item.version}' has no date but contains changes. You have to fix this manually."
                 )
             clean_changelog_items.append(item)
     return sorted(
@@ -242,9 +272,12 @@ def commits_to_prs(packages: List[Package]):
     commits = set.union(*(p.commits for p in packages))
     pr_cache = {}
     commit_to_pr = {}
-    for commit in commits:
+    repo = g.get_repo(REPO)
+    total_commits = len(commits)
+    for i, commit in enumerate(commits):
+        click.echo(f"Processing commit {i} of {total_commits}")
         # Get the list of pull requests associated with the commit
-        commit_obj = g.get_repo(REPO).get_commit(commit)
+        commit_obj = repo.get_commit(commit)
         prs = commit_obj.get_pulls()
         if not prs:
             raise Exception(f"commit {commit} has no associated PRs")
@@ -264,7 +297,10 @@ def update_package_history(package: Package, new_version: Version):
         "Enhancements": [],
         "Other changes": [],
     }
-    if not package.prs:
+    if package.is_new:
+        # For new packages, replace any current text; do not list PRs.
+        sorted_and_formatted_changes.append(FIRST_RELEASE_CHANGELOG_TEXT)
+    elif not package.prs:
         # Skip publishing packages if no change ?
         sorted_and_formatted_changes.append("No recorded changes since last release")
     else:
@@ -334,7 +370,7 @@ VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
 
 
 def is_git_clean(galaxy_root: pathlib.Path):
-    click.echo(f"Making sure galaxy clone at '{galaxy_root}' is clean")
+    click.echo(f"Making sure galaxy clone at '{galaxy_root}' is clean:")
     command = ["git", "diff-index", "--quiet", "HEAD"]
     result = subprocess.run(command, capture_output=True, text=True, cwd=galaxy_root)
     if result.returncode == 0:
@@ -403,7 +439,8 @@ def merge_and_resolve_branches(
             "checkout",
             new_branch,
             str(galaxy_root / "lib" / "galaxy" / "version.py"),
-        ]
+        ],
+        cwd=galaxy_root,
     )
     # we rewrite the packages changelog
     for new_package in packages_to_rewrite:
@@ -431,14 +468,16 @@ def merge_and_resolve_branches(
         dev_version = get_root_version(galaxy_root)
         previous_package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
         previous_package.write_history()
-        subprocess.run(["git", "add", str(previous_package.history_rst)])
+        subprocess.run(["git", "add", str(previous_package.history_rst)], cwd=galaxy_root)
         # restore setup.cfg
-        subprocess.run(["git", "checkout", new_branch, str(previous_package.setup_cfg)]).check_returncode()
+        subprocess.run(
+            ["git", "checkout", new_branch, str(previous_package.setup_cfg)], cwd=galaxy_root
+        ).check_returncode()
     # Commit changes
     if merge_conflict:
-        subprocess.run(["git", "commit", "--no-edit"]).check_returncode()
+        subprocess.run(["git", "commit", "--no-edit"], cwd=galaxy_root).check_returncode()
     else:
-        subprocess.run(["git", "commit", "--amend", "--no-edit"]).check_returncode()
+        subprocess.run(["git", "commit", "--amend", "--no-edit"], cwd=galaxy_root).check_returncode()
 
 
 def get_next_devN_version(galaxy_root) -> Version:
@@ -459,9 +498,10 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
     process = subprocess.run(
         ["git", "merge", "--no-commit", "--no-ff", base_branch],
         cwd=galaxy_root,
-        capture_output=False,
+        capture_output=True,
     )
-    subprocess.run(["git", "merge", "--abort"], cwd=galaxy_root)
+    if not process.stdout == b"Already up to date.\n":
+        subprocess.run(["git", "merge", "--abort"], cwd=galaxy_root)
     if process.returncode == 0:
         return False
     return True
@@ -473,12 +513,13 @@ def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: 
         # Check that the head commit matches the commit for the same branch at the specified remote repo url
         result = subprocess.run(
             ["git", "ls-remote", upstream, f"refs/heads/{branch}"],
+            cwd=galaxy_root,
             capture_output=True,
             text=True,
         )
         result.check_returncode()
         remote_commit_hash = result.stdout.split("\t")[0]
-        result = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=galaxy_root, capture_output=True, text=True)
         result.check_returncode()
         local_commit_hash = result.stdout.strip()
         if remote_commit_hash != local_commit_hash:
@@ -488,9 +529,11 @@ def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: 
     subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
-def push_references(references: List[str], upstream: str = "https://github.com/galaxyproject/galaxy.git"):
+def push_references(
+    references: List[str], galaxy_root: pathlib.Path, upstream: str = "https://github.com/galaxyproject/galaxy.git"
+):
     for reference in references:
-        subprocess.run(["git", "push", upstream, reference]).check_returncode()
+        subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
 
 
 @click.group(help="Subcommands of this script can create new releases and build and upload package artifacts")
@@ -564,10 +607,12 @@ def create_point_release(
             abort=True,
         )
     root_version = get_root_version(galaxy_root)
-    click.echo(f"Current Galaxy version is {root_version}, will create new version {new_version}")
+    base_branch = current_branch = get_current_branch(galaxy_root)
+    click.echo(
+        f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
+    )
     if not no_confirm:
         click.confirm("Does this look correct?", abort=True)
-    base_branch = current_branch = get_current_branch(galaxy_root)
     newer_branches = get_branches(galaxy_root, new_version, base_branch)
     all_branches = newer_branches + [base_branch]
     click.echo("Making sure that all branches are up to date")
@@ -621,11 +666,11 @@ def create_point_release(
     cmd.extend(changed_paths)
     release_tag = f"v{new_version}"
     subprocess.run(cmd, cwd=galaxy_root)
-    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"])
+    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"], cwd=galaxy_root)
     if not no_confirm:
         click.confirm(f"Create git tag '{release_tag}'?", abort=True)
 
-    subprocess.run(["git", "tag", release_tag])
+    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
     dev_version = get_next_devN_version(galaxy_root)
     version_py = set_root_version(galaxy_root, dev_version)
     modified_paths = [version_py]
@@ -636,8 +681,8 @@ def create_point_release(
         modified_paths.extend(package.modified_paths)
     cmd = ["git", "add"]
     cmd.extend([str(p) for p in modified_paths])
-    subprocess.run(cmd)
-    subprocess.run(["git", "commit", "-m", f"Start work on {dev_version}"])
+    subprocess.run(cmd, cwd=galaxy_root)
+    subprocess.run(["git", "commit", "-m", f"Start work on {dev_version}"], cwd=galaxy_root)
     # merge changes into newer branches
     # special care needs to be taken for changelog files
     if not no_confirm and newer_branches:
@@ -652,7 +697,7 @@ def create_point_release(
         current_branch = new_branch
     references = [release_tag] + all_branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
-        push_references(references=references, upstream=upstream)
+        push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
 
 
 if __name__ == "__main__":
