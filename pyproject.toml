@@ -9,4 +9,4 @@ line-length = 120
 [tool.ruff]
 line-length = 120
 # Never enforce `E501`, enforced by black
-ignore = ["E501"]
+lint.ignore = ["E501"]
