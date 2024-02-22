@@ -5,6 +5,11 @@ History
 
 
 ------------------
+0.1.6 (02-21-2024)
+------------------
+* Misc. updates to script by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/9
+
+------------------
 0.1.6 (14-02-2024)
 ------------------
 * Ignore commit without PR by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/4
