@@ -97,7 +97,8 @@ Feature3
 
 Feature description.
 
-Also check out the `${release} user release notes <${release}_announce_user.html>`__
+Also check out the `${release} user release notes <${release}_announce_user.html>`__.
+Are you an admin? Check out `some admin relevant PRs <https://github.com/galaxyproject/galaxy/pulls?q=label%3Ahighlight%2Fadmin+milestone%3A${release}+is%3Aclosed+is%3Apr>`__.
 
 Get Galaxy
 ===========================================================
@@ -265,7 +266,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 - [ ] **Create Release Notes**
 
-    - [ ] Review merged PRs and ensure they all have a milestones attached. [Link](https://github.com/galaxyproject/galaxy/pulls?utf8=%E2%9C%93&q=is%3Apr+is%3Amerged+no%3Amilestone+-label%3Amerge+)
+    - [ ] Review merged PRs and ensure they all have a milestone attached. [Link](https://github.com/galaxyproject/galaxy/pulls?utf8=%E2%9C%93&q=is%3Apr+is%3Amerged+no%3Amilestone+-label%3Amerge+)
     - [ ] Checkout release branch
 
           git checkout release_${version} -b ${version}_release_notes
