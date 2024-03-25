@@ -279,7 +279,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Commit release notes.
 
           git add docs/; git commit -m "Release notes for $version"; git push upstream ${version}_release_notes
-    - [ ] Open a pull request for new release note branch.
+    - [ ] Open a pull request for new release notes branch.
     - [ ] Merge release note pull request.
 
 - [ ] **Do Release**
