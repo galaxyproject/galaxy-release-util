@@ -267,7 +267,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Create Release Notes**
 
     - [ ] Review merged PRs and ensure they all have a milestone attached. [Link](https://github.com/galaxyproject/galaxy/pulls?utf8=%E2%9C%93&q=is%3Apr+is%3Amerged+no%3Amilestone+-label%3Amerge+)
-    - [ ] Checkout release branch
+    - [ ] Switch to release branch and create a new branch for release notes
 
           git checkout release_${version} -b ${version}_release_notes
     - [ ] Bootstrap the release notes
@@ -279,7 +279,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Commit release notes.
 
           git add docs/; git commit -m "Release notes for $version"; git push upstream ${version}_release_notes
-    - [ ] Open a pull request for new release notes branch.
+    - [ ] Open a pull request for the release notes branch.
     - [ ] Merge release note pull request.
 
 - [ ] **Do Release**
