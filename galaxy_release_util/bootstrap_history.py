@@ -276,9 +276,6 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Open newly created files and manually curate major topics and release notes.
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
-    - [ ] Commit release notes.
-
-          git add docs/; git commit -m "Release notes for $version"; git push upstream ${version}_release_notes
     - [ ] Open a pull request for the release notes branch.
     - [ ] Merge release note pull request.
 
