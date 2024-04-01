@@ -300,7 +300,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           cd packages && ./build_packages.sh
 
-    - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html
+    - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_point_release.html
     - [ ] Open PR against planemo with a pin to the new packages
 
 - [ ] **Do Docker Release**
