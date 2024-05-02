@@ -200,7 +200,12 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                     section_delimiter = "=" * len(kind)
                     changes.append(f"\n{section_delimiter}\n{kind}\n{section_delimiter}\n")
                     for section_changelog_item in changelog_item[1:]:
-                        assert isinstance(section_changelog_item, docutils.nodes.bullet_list)
+                        if isinstance(section_changelog_item, docutils.nodes.system_message):
+                            # Likely a warning that subsection (e.g. Bug fixes) is not unique
+                            continue
+                        assert isinstance(section_changelog_item, docutils.nodes.bullet_list), type(
+                            section_changelog_item
+                        )
                         for child in section_changelog_item:
                             add_changelog_item(changes, child)
             changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
