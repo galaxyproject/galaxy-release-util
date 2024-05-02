@@ -5,6 +5,11 @@ History
 
 
 ------------------
+0.1.9 (02-05-2024)
+------------------
+* Fix release script if multiple bug fixes subheadings in changelog by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/15
+
+------------------
 0.1.8 (02-05-2024)
 ------------------
 * Add mypy to CI under python 3.8 by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/11
