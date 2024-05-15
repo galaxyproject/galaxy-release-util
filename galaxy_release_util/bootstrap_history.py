@@ -311,8 +311,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Verify release included in https://docs.galaxyproject.org/en/master/releases/index.html.
     - [ ] Review announcement in https://github.com/galaxyproject/galaxy/blob/dev/doc/source/releases/${version}_announce.rst.
     - [ ] Announce release on [Galaxy Hub](https://galaxyproject.org/) as a news content item. [An example](https://galaxyproject.org/news/2024-02-07-galaxy-release-23-2/).
-    - [ ] Post announcement to [Galaxy Help](https://help.galaxyproject.org/). [An example][(https://help.galaxyproject.org/t/release-of-galaxy-23-2/11675).
-    - [ ] Announce release on Galaxy's social media accounts ([Bluesky](https://bsky.app/profile/galaxyproject.bsky.social), [Mastodon](https://mstdn.science/@galaxyproject), [LinkedIn](https://linkedin.com/company/galaxy-project).
+    - [ ] Post announcement to [Galaxy Help](https://help.galaxyproject.org/). [An example](https://help.galaxyproject.org/t/release-of-galaxy-23-2/11675).
+    - [ ] Announce release on Galaxy's social media accounts ([Bluesky](https://bsky.app/profile/galaxyproject.bsky.social), [Mastodon](https://mstdn.science/@galaxyproject), [LinkedIn](https://linkedin.com/company/galaxy-project)).
     - [ ] Email announcement to [galaxy-dev](http://dev.list.galaxyproject.org/) and [galaxy-announce](http://announce.list.galaxyproject.org/) @lists.galaxyproject.org. [An example](https://lists.galaxyproject.org/archives/list/galaxy-announce@lists.galaxyproject.org/thread/ISB7ZNBDY3LQMC2KALGPVQ3DEJTH657Q/).
     - [ ] Adjust http://getgalaxy.org text and links to match current master branch by opening a PR at https://github.com/galaxyproject/galaxy-hub/
 
