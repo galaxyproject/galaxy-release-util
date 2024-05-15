@@ -255,10 +255,12 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 - [ ] **Deploy and Test Release**
 
-    - [ ] Update test.galaxyproject.org to ensure it is running a dev at or past branch point (${freeze_date} + 1 day).
+    - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
     - [ ] Update testtoolshed.g2.bx.psu.edu to ensure it is running a dev at or past branch point (${freeze_date} + 1 day).
+    - [ ] Conduct release testing on test.galaxyproject.org.
     - [ ] Deploy to usegalaxy.org (${freeze_date} + 1 week).
     - [ ] Deploy to toolshed.g2.bx.psu.edu (${freeze_date} + 1 week).
+    - [ ] Conduct release testing on usegalaxy.org.
     - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
     - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
         - [ ] https://github.com/galaxyproject/tools-iuc/blob/master/.github/workflows/
