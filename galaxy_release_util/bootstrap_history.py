@@ -223,10 +223,11 @@ PRS_TEMPLATE = """
 RELEASE_ISSUE_TEMPLATE = string.Template(
     """
 
-- [X] **Prep**
+- [ ] **Prep**
 
     - [X] ~~Create this release issue ``make release-issue``.~~
     - [X] ~~Set freeze date (${freeze_date}).~~
+    - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
 
 - [ ] **Branch Release (on or around ${freeze_date})**
 
