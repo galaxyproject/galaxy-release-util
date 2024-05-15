@@ -277,7 +277,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
     - [ ] Open a pull request for the release notes branch.
-    - [ ] Merge release note pull request.
+    - [ ] Merge release notes pull request.
 
 - [ ] **Do Release**
 
@@ -302,11 +302,6 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_point_release.html
     - [ ] Open PR against planemo with a pin to the new packages
-
-- [ ] **Do Docker Release**
-
-    - [ ] Change the [dev branch](https://github.com/bgruening/docker-galaxy-stable/tree/dev) of the Galaxy Docker container to ${next_version}
-    - [ ] Merge dev into master
 
 - [ ] **Announce Release**
 
