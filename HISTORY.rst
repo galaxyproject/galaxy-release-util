@@ -4,6 +4,12 @@ History
 .. to_doc
 
 
+-------------------
+0.1.11 (20-05-2024)
+-------------------
+* Update release issue template by @jdavcs in  https://github.com/galaxyproject/galaxy-release-util/pull/16
+* Fix typos in release issue template by @jdavcs in  https://github.com/galaxyproject/galaxy-release-util/pull/18
+
 ------------------
 0.1.9 (02-05-2024)
 ------------------
