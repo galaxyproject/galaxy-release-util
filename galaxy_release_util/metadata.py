@@ -98,4 +98,4 @@ def _pr_to_labels(pr: PullRequest) -> List[str]:
 
 
 def strip_release(message):
-    return re.sub(r"^\s*\[.*\]\s*", r"", message)
+    return re.sub(r"^\s*\[[\w,\.,-]*\]\s*", r"", message)
