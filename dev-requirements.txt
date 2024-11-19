@@ -5,6 +5,7 @@
 mypy
 ruff
 black
+flake8
 
 # For release
 build
