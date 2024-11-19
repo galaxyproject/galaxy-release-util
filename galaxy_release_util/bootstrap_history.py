@@ -567,6 +567,10 @@ def _previous_release(galaxy_root, to: Version):
 
 def _releases(galaxy_root):
     releases_path = galaxy_root / "doc" / "source" / "releases"
+    if not os.path.exists(releases_path):
+        msg = f"Path to releases documentation not found: {releases_path}. If you are running this script outside of galaxy root directory, you should specify the '--galaxy-root' argument"
+        raise Exception(msg)
+
     all_files = sorted(os.listdir(releases_path))
     release_note_file_pattern = re.compile(r"\d+\.\d+.rst")
     release_note_files = [f for f in all_files if release_note_file_pattern.match(f)]

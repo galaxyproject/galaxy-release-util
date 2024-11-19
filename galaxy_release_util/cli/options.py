@@ -15,6 +15,7 @@ galaxy_root_option = click.option(
     "--galaxy-root",
     type=click.Path(exists=True, file_okay=False, resolve_path=True, path_type=pathlib.Path),
     default=".",
+    help="Path to galaxy root.",
 )
 
 
