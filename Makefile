@@ -51,3 +51,7 @@ dist: clean ## create and check packages
 	$(IN_VENV) python -m build
 	$(IN_VENV) twine check dist/*
 	ls -l dist
+
+format:  ## Format Python code base
+	$(IN_VENV) isort .
+	$(IN_VENV) black .
