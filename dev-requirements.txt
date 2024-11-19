@@ -6,6 +6,7 @@ mypy
 ruff
 black
 flake8
+isort
 
 # For release
 build
