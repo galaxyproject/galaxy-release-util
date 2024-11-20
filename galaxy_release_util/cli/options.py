@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 from typing import (
     Any,
@@ -41,7 +42,7 @@ class ClickVersion(click.ParamType):
 class ClickDate(click.ParamType):
     name = "date"
 
-    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> datetime.datetime.date:
+    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> datetime.date:
         try:
             return datetime.datetime.strptime(value, "%Y-%m-%d").date()
         except ValueError as e:
