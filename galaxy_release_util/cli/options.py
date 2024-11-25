@@ -34,5 +34,15 @@ class ClickVersion(click.ParamType):
     def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> Version:
         try:
             return Version(value)
-        except Exception as e:
+        except ValueError as e:
             self.fail(f"{value!r} is not a valid PEP440 version number: {str(e)}", param, ctx)
+
+
+class ClickDate(click.ParamType):
+    name = "date"
+
+    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> datetime.datetime.date:
+        try:
+            return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError as e:
+            self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)
