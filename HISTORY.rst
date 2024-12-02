@@ -4,6 +4,12 @@ History
 .. to_doc
 
 
+------------------
+0.2.0 (12-02-2024)
+------------------
+Misc. refactoring and enhancements to bootstrap_history by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/19
+Fix strip_release bug by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/20
+
 -------------------
 0.1.11 (20-05-2024)
 -------------------
