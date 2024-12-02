@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 from typing import (
     Any,
@@ -15,6 +16,7 @@ galaxy_root_option = click.option(
     "--galaxy-root",
     type=click.Path(exists=True, file_okay=False, resolve_path=True, path_type=pathlib.Path),
     default=".",
+    help="Path to galaxy root.",
 )
 
 
@@ -33,5 +35,15 @@ class ClickVersion(click.ParamType):
     def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> Version:
         try:
             return Version(value)
-        except Exception as e:
+        except ValueError as e:
             self.fail(f"{value!r} is not a valid PEP440 version number: {str(e)}", param, ctx)
+
+
+class ClickDate(click.ParamType):
+    name = "date"
+
+    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> datetime.date:
+        try:
+            return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError as e:
+            self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)

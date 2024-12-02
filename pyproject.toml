@@ -3,10 +3,24 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
-target-version = ['py37']
+target-version = ['py38']
 line-length = 120
 
 [tool.ruff]
+target-version = "py38"
 line-length = 120
 # Never enforce `E501`, enforced by black
 lint.ignore = ["E501"]
+
+[tool.isort]
+combine_as_imports = true
+force_alphabetical_sort_within_sections = true
+# Override force_grid_wrap value from profile=black, but black is still happy
+force_grid_wrap = 2
+# Same line length as for black
+line_length = 120
+no_lines_before = "LOCALFOLDER"
+profile = "black"
+reverse_relative = true
+skip_gitignore = true
+src_paths = ["galaxy_release_util", "tests"]
