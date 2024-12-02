@@ -312,7 +312,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Email announcement to [galaxy-dev](http://dev.list.galaxyproject.org/) and [galaxy-announce](http://announce.list.galaxyproject.org/) @lists.galaxyproject.org. [An example](https://lists.galaxyproject.org/archives/list/galaxy-announce@lists.galaxyproject.org/thread/ISB7ZNBDY3LQMC2KALGPVQ3DEJTH657Q/).
     - [ ] Adjust http://getgalaxy.org text and links to match current master branch by opening a PR at https://github.com/galaxyproject/galaxy-hub/
 
-- [ ] **Complele release**
+- [ ] **Complete release**
 
     - [ ] Close milestone ``${version}`` and ensure milestone ``${next_version}`` exists.
     - [ ] Close this issue.
