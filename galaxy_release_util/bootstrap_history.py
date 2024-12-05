@@ -295,10 +295,6 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           make release-create
 
-    - [ ] Create dev packages:
-
-          cd packages && ./build_packages.sh
-
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
     - [ ] Open PR against planemo with a pin to the new packages
 
