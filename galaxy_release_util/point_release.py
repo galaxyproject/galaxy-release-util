@@ -53,6 +53,7 @@ HISTORY_TEMPLATE = """History
 """
 RELEASE_BRANCH_REGEX = re.compile(r"^release_(\d{2}\.\d{1,2})$")
 FIRST_RELEASE_CHANGELOG_TEXT = "First release"
+GALAXY_PACKAGE_DEP_REGEX = re.compile(r"^(    galaxy-[^=]+)==.*$")
 
 
 @dataclass
@@ -117,6 +118,10 @@ class Package:
     def changelog(self) -> str:
         changelog_string = "\n".join(str(h) for h in self.package_history)
         return f"{HISTORY_TEMPLATE}{changelog_string}"
+
+    @property
+    def pinned_requirements_txt(self) -> str:
+        return self.path / ".." / ".." / "lib" / "galaxy" / "dependencies" / "pinned-requirements.txt"
 
     def write_history(self):
         self.history_rst.write_text(self.changelog)
