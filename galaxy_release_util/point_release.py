@@ -48,6 +48,7 @@ HISTORY_TEMPLATE = """History
 """
 RELEASE_BRANCH_REGEX = re.compile(r"^release_(\d{2}\.\d{1,2})$")
 FIRST_RELEASE_CHANGELOG_TEXT = "First release"
+GALAXY_PACKAGE_DEP_REGEX = re.compile(r"^(    galaxy-[^=]+)==.*$")
 
 
 @dataclass
@@ -112,6 +113,10 @@ class Package:
     def changelog(self) -> str:
         changelog_string = "\n".join(str(h) for h in self.package_history)
         return f"{HISTORY_TEMPLATE}{changelog_string}"
+
+    @property
+    def pinned_requirements_txt(self) -> str:
+        return self.path / ".." / ".." / "lib" / "galaxy" / "dependencies" / "pinned-requirements.txt"
 
     def write_history(self):
         self.history_rst.write_text(self.changelog)
@@ -230,9 +235,30 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
 def bump_package_version(package: Package, new_version: Version):
     new_content = []
     content = package.setup_cfg.read_text().splitlines()
+    install_requires = False
+    requirements_txt = False
     for line in content:
         if line.startswith("version = "):
             line = f"version = {new_version}"
+        elif line.startswith("install_requires ="):
+            install_requires = True
+        elif package.name == "galaxy" and install_requires:
+            # Update requirements in the galaxy metapackage
+            if requirements_txt and line.startswith("    "):
+                continue
+            if requirements_txt and not line.startswith("    "):
+                install_requires = False
+            elif not requirements_txt and line.startswith("    galaxy-"):
+                match = GALAXY_PACKAGE_DEP_REGEX.match(line)
+                if match:
+                    line = f"{match.group(1)}=={new_version}"
+            elif line == "    # BEGIN pinned-requirements.txt":
+                new_content.append(line)
+                requirements_txt = True
+                requirements = [f"    {x.strip()}" for x in open(package.pinned_requirements_txt).readlines() if
+                                x.strip() and not x.startswith('--')]
+                new_content.extend(requirements)
+                continue
         new_content.append(line)
     package.setup_cfg.write_text("\n".join(new_content))
     package.modified_paths.append(package.setup_cfg)
