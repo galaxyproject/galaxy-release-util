@@ -585,6 +585,7 @@ def build_and_upload(
     "--new-version",
     type=ClickVersion(),
     help="Specify new release version. Must be valid PEP 440 version",
+    required=True,
 )
 @click.option(
     "--last-commit",
