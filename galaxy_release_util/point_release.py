@@ -33,6 +33,7 @@ from .metadata import (
     _text_target,
     strip_release,
 )
+from .util import verify_galaxy_root
 
 g = github_client()
 PROJECT_OWNER = "galaxyproject"
@@ -604,6 +605,7 @@ def create_point_release(
     no_confirm: bool,
     upstream: str,
 ):
+    verify_galaxy_root(galaxy_root)
     # Update version.py
     if not is_git_clean(galaxy_root):
         click.confirm(

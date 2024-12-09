@@ -36,6 +36,7 @@ from .metadata import (
     PROJECT_URL,
     strip_release,
 )
+from .util import verify_galaxy_root
 
 OLDER_RELEASES_FILENAME = "older_releases.rst"
 
@@ -388,6 +389,7 @@ def create_release_issue(
     release_date: datetime.date,
     dry_run: bool,
 ):
+    verify_galaxy_root(galaxy_root)
     previous_version = _get_previous_release_version(galaxy_root, release_version)
     next_version = next_version or _get_next_release_version(release_version)
     assert next_version > release_version, "Next release version should be greater than release version"
@@ -457,6 +459,7 @@ def create_changelog(release_version: Version, next_version: Version, galaxy_roo
         filename = _release_file(galaxy_root, f"{next_version}_announce.rst")
         _write_file(filename, content, skip_if_exists=True)
 
+    verify_galaxy_root(galaxy_root)
     next_version = next_version or _get_next_release_version(release_version)
     create_release_file()
     create_announcement_file()
@@ -645,7 +648,7 @@ def _get_release_documentation_filenames(galaxy_root: Path) -> List[str]:
     """Return contents of release documentation directory."""
     releases_path = galaxy_root / "doc" / "source" / "releases"
     if not os.path.exists(releases_path):
-        msg = f"Path to releases documentation not found: {releases_path}. If you are running this script outside of galaxy root directory, you should specify the '--galaxy-root' argument"
+        msg = f"Path to releases documentation not found: {releases_path}"
         raise Exception(msg)
     return sorted(os.listdir(releases_path))
 
