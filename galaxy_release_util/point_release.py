@@ -115,7 +115,7 @@ class Package:
         return f"{HISTORY_TEMPLATE}{changelog_string}"
 
     @property
-    def pinned_requirements_txt(self) -> str:
+    def pinned_requirements_txt(self) -> pathlib.Path:
         return self.path / ".." / ".." / "lib" / "galaxy" / "dependencies" / "pinned-requirements.txt"
 
     def write_history(self):
