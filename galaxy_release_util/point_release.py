@@ -255,8 +255,11 @@ def bump_package_version(package: Package, new_version: Version):
             elif line == "    # BEGIN pinned-requirements.txt":
                 new_content.append(line)
                 requirements_txt = True
-                requirements = [f"    {x.strip()}" for x in open(package.pinned_requirements_txt).readlines() if
-                                x.strip() and not x.startswith('--')]
+                requirements = [
+                    f"    {x.strip()}"
+                    for x in open(package.pinned_requirements_txt).readlines()
+                    if x.strip() and not x.startswith("--")
+                ]
                 new_content.extend(requirements)
                 continue
         new_content.append(line)
