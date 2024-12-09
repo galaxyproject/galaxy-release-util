@@ -513,25 +513,27 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
 
 
 def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
-    for branch in branches:
-        subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
-        # Check that the head commit matches the commit for the same branch at the specified remote repo url
-        result = subprocess.run(
-            ["git", "ls-remote", upstream, f"refs/heads/{branch}"],
-            cwd=galaxy_root,
-            capture_output=True,
-            text=True,
-        )
-        result.check_returncode()
-        remote_commit_hash = result.stdout.split("\t")[0]
-        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=galaxy_root, capture_output=True, text=True)
-        result.check_returncode()
-        local_commit_hash = result.stdout.strip()
-        if remote_commit_hash != local_commit_hash:
-            raise Exception(
-                f"Local tip of branch {branch} is {local_commit_hash}, remote tip of branch is {remote_commit_hash}. Make sure that your local branches are up to date and track f{upstream}."
+    try:
+        for branch in branches:
+            subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
+            # Check that the head commit matches the commit for the same branch at the specified remote repo url
+            result = subprocess.run(
+                ["git", "ls-remote", upstream, f"refs/heads/{branch}"],
+                cwd=galaxy_root,
+                capture_output=True,
+                text=True,
             )
-    subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
+            result.check_returncode()
+            remote_commit_hash = result.stdout.split("\t")[0]
+            result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=galaxy_root, capture_output=True, text=True)
+            result.check_returncode()
+            local_commit_hash = result.stdout.strip()
+            if remote_commit_hash != local_commit_hash:
+                raise Exception(
+                    f"Local tip of branch {branch} is {local_commit_hash}, remote tip of branch is {remote_commit_hash}. Make sure that your local branches are up to date and track f{upstream}."
+                )
+    finally:
+        subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
 def push_references(
