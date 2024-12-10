@@ -512,7 +512,7 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
     return True
 
 
-def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
+def _ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
     try:
         for branch in branches:
             subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
@@ -532,6 +532,25 @@ def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: 
                 raise Exception(
                     f"Local tip of branch {branch} is {local_commit_hash}, remote tip of branch is {remote_commit_hash}. Make sure that your local branches are up to date and track f{upstream}."
                 )
+    finally:
+        subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
+
+
+def _ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm):
+    current_branch = base_branch
+    try:
+        for new_branch in newer_branches:
+            merge_required = is_merge_required(
+                base_branch=current_branch, new_branch=new_branch, galaxy_root=galaxy_root
+            )
+            if merge_required:
+                msg = f"Merge conflicts occurred while attempting to merge branch {current_branch} into {new_branch}. You should resolve conflicts and try again."
+                if no_confirm:
+                    raise Exception(msg)
+                click.echo(msg)
+                if click.confirm("Continue anyway ?", abort=True):
+                    current_branch = new_branch
+                    break
     finally:
         subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
@@ -609,37 +628,38 @@ def create_point_release(
     no_confirm: bool,
     upstream: str,
 ):
-    verify_galaxy_root(galaxy_root)
-    # Update version.py
-    if not is_git_clean(galaxy_root):
-        click.confirm(
-            "Your galaxy clone has untracked or staged changes, are you sure you want to continue ?",
-            abort=True,
+    def check_galaxy_repo_is_clean():
+        if not is_git_clean(galaxy_root):
+            click.confirm(
+                "Your galaxy clone has untracked or staged changes, are you sure you want to continue?",
+                abort=True,
+            )
+
+    def get_user_confirmation():
+        root_version = get_root_version(galaxy_root)
+        click.echo(
+            f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
         )
-    root_version = get_root_version(galaxy_root)
-    base_branch = current_branch = get_current_branch(galaxy_root)
-    click.echo(
-        f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
-    )
-    if not no_confirm:
-        click.confirm("Does this look correct?", abort=True)
+        if not no_confirm:
+            click.confirm("Does this look correct?", abort=True)
+
+    def ensure_branches_up_to_date():
+        click.echo("Making sure that all branches are up to date")
+        _ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
+
+    def ensure_clean_merges():
+        click.echo("Making sure that merging forward will result in clean merges")
+        _ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm)
+
+    verify_galaxy_root(galaxy_root)
+    check_galaxy_repo_is_clean()
+    base_branch = get_current_branch(galaxy_root)
+    get_user_confirmation()
     newer_branches = get_branches(galaxy_root, new_version, base_branch)
     all_branches = newer_branches + [base_branch]
-    click.echo("Making sure that all branches are up to date")
-    ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
+    ensure_branches_up_to_date()
+    ensure_clean_merges()
 
-    click.echo("Making sure that merging forward will result in clean merges")
-    for new_branch in newer_branches:
-        merge_required = is_merge_required(base_branch=current_branch, new_branch=new_branch, galaxy_root=galaxy_root)
-        if merge_required:
-            msg = f"Merge conflicts occurred while attempting to merge branch {current_branch} into {new_branch}. You should resolve conflicts and try again."
-            if no_confirm:
-                raise Exception(msg)
-            click.echo(msg)
-            if click.confirm("Continue anyway ?", abort=True):
-                current_branch = new_branch
-                break
-    subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
     modified_paths = [set_root_version(galaxy_root, new_version)]
     # read packages and find prs that affect a package
     packages: List[Package] = []
