@@ -248,18 +248,33 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 1 week, to allow time for notification prior to release.
     - [ ] Ensure ownership of outstanding bugfixes and track progress during freeze.
 
-- [ ] **Deploy and Test Release**
+- [ ] **Deploy and Test Release on galaxy-test**
 
     - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
     - [ ] Update testtoolshed.g2.bx.psu.edu to ensure it is running a dev at or past branch point (${freeze_date} + 1 day).
-    - [ ] Conduct first stage of release testing on test.galaxyproject.org.
-    - [ ] Upon completing release testing and fixing all critical bugs, deploy to usegalaxy.org.
-    - [ ] Deploy to toolshed.g2.bx.psu.edu.
-    - [ ] Conduct second stage of release testing on usegalaxy.org.
-    - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
-    - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
-        - [ ] https://github.com/galaxyproject/tools-iuc/blob/master/.github/workflows/
-        - [ ] https://github.com/galaxyproject/tools-devteam/blob/master/.github/workflows/
+    - [ ] Conduct formal release testing on test.galaxyproject.org (see ${version} release testing plan).
+    - [ ] Ensure all critical bugs detected during release testing have been fixed.
+
+
+- [ ] **Run tool and workflow tests:**
+
+    - [ ] IUC:
+        - [ ] Open an issue "Test release ${version}" on the iuc repo: https://github.com/galaxyproject/tools-iuc/
+        - [ ] Post this comment to that issue: `/run-all-tool-tests branch=release_${version}`. This will trigger the "Weekly global Tool Linting and Tests" github workflow that lints and tests all IUC tools.
+        - [ ] Wait for the workflow to complete, after which a brief summary will be automatically posted to the issue with a link to the workflow results.
+        - [ ] Examine workflow results, comparing them with the results of a [previous run of the same workflow](https://github.com/galaxyproject/tools-iuc/actions?query=workflow%3A%22Weekly+global+Tool+Linting+and+Tests%22) on the previous release (${previous_version}).
+              For each failed test:
+              - Does it occur under ${version} but not under ${previous_version}? If so:
+                - Check if there's an issue open. If not, open a new issue.
+
+    - [ ] IWC:
+        - [ ] Open an issue "Test release ${version}" on the iwc repo: https://github.com/galaxyproject/iwc/
+        - [ ] Post this comment to that issue: `/run-all-workflow-tests branch=release_${version}`. This will trigger the "Weekly global Workflow Linting and Tests" github workflow that lints and tests all IWC workflows.
+        - [ ] Wait for the workflow to complete, after which a brief summary will be automatically posted to the issue with a link to the workflow results.
+        - [ ] Examine workflow results, comparing them with the results of a [previous run of the same workflow](https://github.com/galaxyproject/iwc/actions?query=workflow%3A%22Weekly+global+Workflow+Linting+and+Tests%22) on the previous release (${previous_version}).
+              For each failed test:
+              - Does it occur under ${version} but not under ${previous_version}? If so:
+                - Check if there's an issue open. If not, open a new issue.
 
 - [ ] **Create Release Notes**
 
@@ -275,6 +290,15 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Add new release to doc/source/releases/index.rst
     - [ ] Open a pull request for the release notes branch.
     - [ ] Merge release notes pull request.
+
+- [ ] **Deploy and Test Release on galaxy-main**
+    - [ ] Update usegalaxy.org to ensure it is running the ``release_${version}`` branch.
+    - [ ] Deploy to toolshed.g2.bx.psu.edu.
+    - [ ] Conduct second stage of release testing on usegalaxy.org.
+    - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
+    - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
+        - [ ] https://github.com/galaxyproject/tools-iuc/blob/master/.github/workflows/
+        - [ ] https://github.com/galaxyproject/tools-devteam/blob/master/.github/workflows/
 
 - [ ] **Do Release**
 
