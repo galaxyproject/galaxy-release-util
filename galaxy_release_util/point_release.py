@@ -533,7 +533,8 @@ def _ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream:
                     f"Local tip of branch {branch} is {local_commit_hash}, remote tip of branch is {remote_commit_hash}. Make sure that your local branches are up to date and track f{upstream}."
                 )
     finally:
-        subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
+        if branch != base_branch:
+            subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
 def _ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm):
