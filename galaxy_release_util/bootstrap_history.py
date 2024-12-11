@@ -265,7 +265,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
         - [ ] Examine workflow results, comparing them with the results of a [previous run of the same workflow](https://github.com/galaxyproject/tools-iuc/actions?query=workflow%3A%22Weekly+global+Tool+Linting+and+Tests%22) on the previous release (${previous_version}).
               For each failed test:
               - Does it occur under ${version} but not under ${previous_version}? If so:
-	          - Check if there's an issue open. If not, open a new issue.
+                - Check if there's an issue open. If not, open a new issue.
 
     - [ ] IWC:
         - [ ] Open an issue "Test release ${version}" on the iwc repo: https://github.com/galaxyproject/iwc/
@@ -274,7 +274,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
         - [ ] Examine workflow results, comparing them with the results of a [previous run of the same workflow](https://github.com/galaxyproject/iwc/actions?query=workflow%3A%22Weekly+global+Workflow+Linting+and+Tests%22) on the previous release (${previous_version}).
               For each failed test:
               - Does it occur under ${version} but not under ${previous_version}? If so:
-	          - Check if there's an issue open. If not, open a new issue.
+                - Check if there's an issue open. If not, open a new issue.
 
 - [ ] **Create Release Notes**
 
