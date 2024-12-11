@@ -33,7 +33,10 @@ from .metadata import (
     _text_target,
     strip_release,
 )
-from .util import verify_galaxy_root
+from .util import (
+    verify_galaxy_root,
+    version_filepath,
+)
 
 g = github_client()
 PROJECT_OWNER = "galaxyproject"
@@ -354,7 +357,7 @@ def upload_package(package: Package):
 
 
 def get_root_version(galaxy_root: pathlib.Path) -> Version:
-    version_py = galaxy_root / "lib" / "galaxy" / "version.py"
+    version_py = version_filepath(galaxy_root)
     version_py_contents = version_py.read_text().splitlines()
     assert len(version_py_contents) == 3
     major_version = version_py_contents[0].split('"')[1]
@@ -369,7 +372,7 @@ def set_root_version(galaxy_root: pathlib.Path, new_version: Version) -> pathlib
 VERSION_MINOR = "{minor_galaxy_release_string}"
 VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
 """
-    version_py = galaxy_root / "lib" / "galaxy" / "version.py"
+    version_py = version_filepath(galaxy_root)
     version_py.write_text(VERSION_PY_TEMPLATE)
     return version_py
 
@@ -443,7 +446,7 @@ def merge_and_resolve_branches(
             "git",
             "checkout",
             new_branch,
-            str(galaxy_root / "lib" / "galaxy" / "version.py"),
+            str(version_filepath(galaxy_root)),
         ],
         cwd=galaxy_root,
     )
