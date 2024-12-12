@@ -242,7 +242,7 @@ def bump_package_version(package: Package, new_version: Version):
     package.modified_paths.append(package.setup_cfg)
 
 
-def get_commits_since_last_version(package: Package, last_version_tag: str):
+def get_commits_since_last_version(package: Package, last_version_tag: str) -> Set[str]:
     click.echo(f"finding commits to package {package.name} made since {last_version_tag}")
     package_source_paths = []
     commits = set()
@@ -269,11 +269,17 @@ def get_commits_since_last_version(package: Package, last_version_tag: str):
             capture_output=True,
             text=True,
         )
-        result.check_returncode()
+        try:
+            result.check_returncode()
+        except subprocess.CalledProcessError as err:
+            if "unknown revision" in result.stderr:
+                raise Exception(f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier") from err
+            raise err
+
         for line in result.stdout.splitlines():
             if line:
                 commits.add(line)
-    package.commits = commits
+    return commits
 
 
 def commits_to_prs(packages: List[Package]):
@@ -283,7 +289,7 @@ def commits_to_prs(packages: List[Package]):
     repo = g.get_repo(REPO)
     total_commits = len(commits)
     for i, commit in enumerate(commits):
-        click.echo(f"Processing commit {i} of {total_commits}")
+        click.echo(f"Processing commit {i + 1} of {total_commits}")
         # Get the list of pull requests associated with the commit
         commit_obj = repo.get_commit(commit)
         prs = commit_obj.get_pulls()
@@ -365,14 +371,13 @@ def get_root_version(galaxy_root: pathlib.Path) -> Version:
     return Version(f"{major_version}.{minor_version}")
 
 
-def set_root_version(galaxy_root: pathlib.Path, new_version: Version) -> pathlib.Path:
+def set_root_version(version_py: pathlib.Path, new_version: Version) -> pathlib.Path:
     major_galaxy_release_string = f"{new_version.major}.{new_version.minor}"
     minor_galaxy_release_string = str(new_version).replace(f"{major_galaxy_release_string}.", "")
     VERSION_PY_TEMPLATE = f"""VERSION_MAJOR = "{major_galaxy_release_string}"
 VERSION_MINOR = "{minor_galaxy_release_string}"
 VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
 """
-    version_py = version_filepath(galaxy_root)
     version_py.write_text(VERSION_PY_TEMPLATE)
     return version_py
 
@@ -643,15 +648,11 @@ def create_point_release(
     ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
     ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm)
 
-    modified_paths = [set_root_version(galaxy_root, new_version)]
-    # read packages and find prs that affect a package
-    packages: List[Package] = []
-    for package_path in get_sorted_package_paths(galaxy_root):
-        if package_subset and package_path.name not in package_subset:
-            continue
-        package = read_package(package_path)
-        packages.append(package)
-        get_commits_since_last_version(package, last_commit)
+    version_py = version_filepath(galaxy_root)
+    set_root_version(version_py, new_version)
+    modified_paths = [version_py]
+
+    packages = load_packages(galaxy_root, package_subset, last_commit)
     commits_to_prs(packages)
     # update package versions and changelog files
     for package in packages:
@@ -685,7 +686,7 @@ def create_point_release(
 
     subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
     dev_version = get_next_devN_version(galaxy_root)
-    version_py = set_root_version(galaxy_root, dev_version)
+    version_py = set_root_version(version_py, dev_version)
     modified_paths = [version_py]
     for package in packages:
         bump_package_version(package, dev_version)
@@ -728,6 +729,18 @@ def get_user_confirmation(galaxy_root: pathlib.Path, new_version: Version, base_
     )
     if not no_confirm:
         click.confirm("Does this look correct?", abort=True)
+
+
+def load_packages(galaxy_root: pathlib.Path, package_subset: List[str], last_commit: str) -> List[Package]:
+    """ Read packages and find prs that affect a package. """
+    packages: List[Package] = []
+    for package_path in get_sorted_package_paths(galaxy_root):
+        if package_subset and package_path.name not in package_subset:
+            continue
+        package = read_package(package_path)
+        packages.append(package)
+        package.commits = get_commits_since_last_version(package, last_commit)
+    return packages
 
 
 if __name__ == "__main__":
