@@ -515,7 +515,8 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
     return True
 
 
-def _ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
+def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
+    click.echo("Making sure that all branches are up to date")
     try:
         for branch in branches:
             subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
@@ -540,7 +541,8 @@ def _ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream:
             subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
-def _ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm):
+def ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm):
+    click.echo("Making sure that merging forward will result in clean merges")
     current_branch = base_branch
     try:
         for new_branch in newer_branches:
@@ -632,37 +634,14 @@ def create_point_release(
     no_confirm: bool,
     upstream: str,
 ):
-    def check_galaxy_repo_is_clean():
-        if not is_git_clean(galaxy_root):
-            click.confirm(
-                "Your galaxy clone has untracked or staged changes, are you sure you want to continue?",
-                abort=True,
-            )
-
-    def get_user_confirmation():
-        root_version = get_root_version(galaxy_root)
-        click.echo(
-            f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
-        )
-        if not no_confirm:
-            click.confirm("Does this look correct?", abort=True)
-
-    def ensure_branches_up_to_date():
-        click.echo("Making sure that all branches are up to date")
-        _ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
-
-    def ensure_clean_merges():
-        click.echo("Making sure that merging forward will result in clean merges")
-        _ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm)
-
     verify_galaxy_root(galaxy_root)
-    check_galaxy_repo_is_clean()
+    check_galaxy_repo_is_clean(galaxy_root)
     base_branch = get_current_branch(galaxy_root)
-    get_user_confirmation()
+    get_user_confirmation(galaxy_root, new_version, base_branch, no_confirm)
     newer_branches = get_branches(galaxy_root, new_version, base_branch)
     all_branches = newer_branches + [base_branch]
-    ensure_branches_up_to_date()
-    ensure_clean_merges()
+    ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
+    ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm)
 
     modified_paths = [set_root_version(galaxy_root, new_version)]
     # read packages and find prs that affect a package
@@ -732,6 +711,23 @@ def create_point_release(
     references = [release_tag] + all_branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
         push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
+
+
+def check_galaxy_repo_is_clean(galaxy_root: pathlib.Path):
+    if not is_git_clean(galaxy_root):
+        click.confirm(
+            "Your galaxy clone has untracked or staged changes, are you sure you want to continue?",
+            abort=True,
+        )
+
+
+def get_user_confirmation(galaxy_root: pathlib.Path, new_version: Version, base_branch: str, no_confirm: bool) -> None:
+    root_version = get_root_version(galaxy_root)
+    click.echo(
+        f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
+    )
+    if not no_confirm:
+        click.confirm("Does this look correct?", abort=True)
 
 
 if __name__ == "__main__":
