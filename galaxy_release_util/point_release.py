@@ -591,6 +591,7 @@ def build_and_upload(
     "--last-commit",
     type=str,
     help="Specify commit or tag that was used for the last package release. This is used to find the changelog for packages.",
+    required=True,
 )
 @click.option("--build-packages/--no-build-packages", type=bool, is_flag=True, default=True)
 @click.option("--upload-packages", type=bool, is_flag=True, default=False)
