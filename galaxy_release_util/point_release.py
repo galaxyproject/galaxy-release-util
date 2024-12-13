@@ -564,13 +564,6 @@ def ensure_clean_merges(newer_branches: List[str], base_branch: str, galaxy_root
         subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
-def push_references(
-    references: List[str], galaxy_root: Path, upstream: str = "https://github.com/galaxyproject/galaxy.git"
-) -> None:
-    for reference in references:
-        subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
-
-
 @click.group(help="Subcommands of this script can create new releases and build and upload package artifacts")
 def cli():
     pass
@@ -668,7 +661,7 @@ def create_point_release(
     stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
 
     merge_changes_into_newer_branches(galaxy_root, packages, newer_branches, base_branch, no_confirm)
-    run_push_references(galaxy_root, release_tag, all_branches, upstream, no_confirm)
+    push_references(galaxy_root, release_tag, all_branches, upstream, no_confirm)
 
 
 def check_galaxy_repo_is_clean(galaxy_root: Path) -> None:
@@ -788,12 +781,11 @@ def merge_changes_into_newer_branches(
         current_branch = new_branch
 
 
-def run_push_references(
-    galaxy_root: Path, release_tag: str, branches: List[str], upstream: str, no_confirm: bool
-) -> None:
+def push_references(galaxy_root: Path, release_tag: str, branches: List[str], upstream: str, no_confirm: bool) -> None:
     references = [release_tag] + branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
-        push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
+        for reference in references:
+            subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
 
 
 if __name__ == "__main__":
