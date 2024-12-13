@@ -343,7 +343,6 @@ def update_package_history(package: Package, new_version: Version):
         0,
         ChangelogItem(version=new_version, changes=sorted_and_formatted_changes, date=now),
     )
-    package.write_history()
 
 
 def build_package(package: Package):
@@ -727,6 +726,7 @@ def update_packages(packages: List[Package], new_version: Version, modified_path
         if new_version:
             bump_package_version(package, new_version)
             update_package_history(package, new_version)
+            package.write_history()
         modified_paths.extend(package.modified_paths)
 
 
