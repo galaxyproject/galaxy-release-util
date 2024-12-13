@@ -394,14 +394,14 @@ def is_git_clean(galaxy_root: pathlib.Path):
         return False
 
 
-def get_current_branch(galaxy_root):
+def get_current_branch(galaxy_root) -> str:
     current_branch_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
     result = subprocess.run(current_branch_cmd, cwd=galaxy_root, capture_output=True, text=True)
     result.check_returncode()
     return result.stdout.strip()
 
 
-def get_branches(galaxy_root: pathlib.Path, new_version: Version, current_branch: str):
+def get_branches(galaxy_root: pathlib.Path, new_version: Version, current_branch: str) -> List[str]:
     """
     Tries to get release and dev branches that we need to merge forward to.
     """
@@ -667,18 +667,8 @@ def create_point_release(
     commit_message = f"Start work on {dev_version}"
     stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
 
-    # merge changes into newer branches
-    # special care needs to be taken for changelog files
-    if not no_confirm and newer_branches:
-        click.confirm(
-            f"Merge branch '{base_branch}' into {', '.join(newer_branches)} ?",
-            abort=True,
-        )
-    current_branch = base_branch
-    for new_branch in newer_branches:
-        click.echo(f"Merging {base_branch} into {new_branch}")
-        merge_and_resolve_branches(galaxy_root, current_branch, new_branch, packages)
-        current_branch = new_branch
+    merge_changes_into_newer_branches(galaxy_root, packages, newer_branches, base_branch, no_confirm)
+
     references = [release_tag] + all_branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
         push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
@@ -776,6 +766,29 @@ def create_tag(galaxy_root: pathlib.Path, release_tag: str, no_confirm: bool) ->
     if not no_confirm:
         click.confirm(f"Create git tag '{release_tag}'?", abort=True)
     subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
+
+
+def merge_changes_into_newer_branches(
+    galaxy_root: pathlib.Path,
+    packages: List[Package],
+    newer_branches: List[str],
+    base_branch: str,
+    no_confirm: bool,
+) -> None:
+    """
+    Merge changes into newer branches.
+    Special care needs to be taken for changelog files.
+    """
+    if not no_confirm and newer_branches:
+        click.confirm(
+            f"Merge branch '{base_branch}' into {', '.join(newer_branches)} ?",
+            abort=True,
+        )
+    current_branch = base_branch
+    for new_branch in newer_branches:
+        click.echo(f"Merging {base_branch} into {new_branch}")
+        merge_and_resolve_branches(galaxy_root, current_branch, new_branch, packages)
+        current_branch = new_branch
 
 
 if __name__ == "__main__":
