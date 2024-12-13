@@ -273,7 +273,9 @@ def get_commits_since_last_version(package: Package, last_version_tag: str) -> S
             result.check_returncode()
         except subprocess.CalledProcessError as err:
             if "unknown revision" in result.stderr:
-                raise Exception(f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier") from err
+                raise Exception(
+                    f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier"
+                ) from err
             raise err
 
         for line in result.stdout.splitlines():
@@ -654,14 +656,8 @@ def create_point_release(
 
     packages = load_packages(galaxy_root, package_subset, last_commit)
     commits_to_prs(packages)
-    # update package versions and changelog files
-    for package in packages:
-        if new_version:
-            bump_package_version(package, new_version)
-            update_package_history(package, new_version)
-        if build_packages:
-            build_package(package)
-        modified_paths.extend(package.modified_paths)
+    update_packages(packages, new_version, build_packages, modified_paths)
+
     # show changed paths, optionally run git diff
     changed_paths = [str(p) for p in modified_paths]
     pretty_paths = "\n".join(changed_paths)
@@ -732,7 +728,7 @@ def get_user_confirmation(galaxy_root: pathlib.Path, new_version: Version, base_
 
 
 def load_packages(galaxy_root: pathlib.Path, package_subset: List[str], last_commit: str) -> List[Package]:
-    """ Read packages and find prs that affect a package. """
+    """Read packages and find prs that affect a package."""
     packages: List[Package] = []
     for package_path in get_sorted_package_paths(galaxy_root):
         if package_subset and package_path.name not in package_subset:
@@ -741,6 +737,19 @@ def load_packages(galaxy_root: pathlib.Path, package_subset: List[str], last_com
         packages.append(package)
         package.commits = get_commits_since_last_version(package, last_commit)
     return packages
+
+
+def update_packages(
+    packages: List[Package], new_version: Version, build_packages: bool, modified_paths: List[pathlib.Path]
+) -> None:
+    """Update package versions and changelog files."""
+    for package in packages:
+        if new_version:
+            bump_package_version(package, new_version)
+            update_package_history(package, new_version)
+        if build_packages:
+            build_package(package)
+        modified_paths.extend(package.modified_paths)
 
 
 if __name__ == "__main__":
