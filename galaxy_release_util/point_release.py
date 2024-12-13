@@ -306,7 +306,7 @@ def commits_to_prs(packages: List[Package]):
         package.prs = set(commit_to_pr[commit] for commit in package.commits if commit in commit_to_pr)
 
 
-def update_package_history(package: Package, new_version: Version):
+def get_package_history(package: Package, new_version: Version) -> ChangelogItem:
     sorted_and_formatted_changes = []
     changes: Dict[str, List[str]] = {
         "Bug fixes": [],
@@ -339,10 +339,7 @@ def update_package_history(package: Package, new_version: Version):
         sorted_and_formatted_changes.extend(entries)
 
     now = datetime.datetime.now().strftime("%Y-%m-%d")
-    package.package_history.insert(
-        0,
-        ChangelogItem(version=new_version, changes=sorted_and_formatted_changes, date=now),
-    )
+    return ChangelogItem(version=new_version, changes=sorted_and_formatted_changes, date=now)
 
 
 def build_package(package: Package):
@@ -663,13 +660,10 @@ def create_point_release(
     stage_changes_commit_and_tag(galaxy_root, new_version, modified_paths, release_tag, no_confirm)
 
     dev_version = get_next_devN_version(galaxy_root)
-    version_py = set_root_version(version_py, dev_version)
+    set_root_version(version_py, dev_version)
     modified_paths = [version_py]
-    for package in packages:
-        bump_package_version(package, dev_version)
-        package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
-        package.write_history()
-        modified_paths.extend(package.modified_paths)
+    update_packages(packages, dev_version, modified_paths, is_dev_version=True)
+
     cmd = ["git", "add"]
     cmd.extend([str(p) for p in modified_paths])
     subprocess.run(cmd, cwd=galaxy_root)
@@ -720,11 +714,19 @@ def load_packages(galaxy_root: pathlib.Path, package_subset: List[str], last_com
     return packages
 
 
-def update_packages(packages: List[Package], new_version: Version, modified_paths: List[pathlib.Path]) -> None:
+def update_packages(
+    packages: List[Package], new_version: Version, modified_paths: List[pathlib.Path], is_dev_version: bool = False
+) -> None:
     """Update package versions and changelog files."""
     for package in packages:
         bump_package_version(package, new_version)
-        update_package_history(package, new_version)
+
+        if not is_dev_version:
+            changelog_item = get_package_history(package, new_version)
+        else:
+            changelog_item = ChangelogItem(version=new_version, changes=[], date=None)
+        package.package_history.insert(0, changelog_item)
+
         package.write_history()
         modified_paths.extend(package.modified_paths)
 
