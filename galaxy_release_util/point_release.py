@@ -658,10 +658,8 @@ def create_point_release(
     commits_to_prs(packages)
     update_packages(packages, new_version, build_packages, modified_paths)
     show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
+    run_upload_packages(build_packages, upload_packages, no_confirm, packages)
 
-    if build_packages and upload_packages and (no_confirm or click.confirm("Upload packages to ?")):
-        for package in packages:
-            upload_package(package)
     # stage changes, commit and tag
     if not no_confirm:
         click.confirm("Stage and commit changes ?", abort=True)
@@ -755,6 +753,12 @@ def show_modified_paths_and_diff(galaxy_root: pathlib.Path, modified_paths: List
         cmd = ["git", "diff"]
         cmd.extend(modified_paths_str)
         subprocess.run(cmd, cwd=galaxy_root)
+
+
+def run_upload_packages(build_packages: bool, upload_packages: bool, no_confirm: bool, packages: List[Package]):
+    if build_packages and upload_packages and (no_confirm or click.confirm("Upload packages to ?")):
+        for package in packages:
+            upload_package(package)
 
 
 if __name__ == "__main__":
