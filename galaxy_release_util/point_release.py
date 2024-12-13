@@ -657,15 +657,8 @@ def create_point_release(
     packages = load_packages(galaxy_root, package_subset, last_commit)
     commits_to_prs(packages)
     update_packages(packages, new_version, build_packages, modified_paths)
+    show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
 
-    # show changed paths, optionally run git diff
-    changed_paths = [str(p) for p in modified_paths]
-    pretty_paths = "\n".join(changed_paths)
-    click.echo(f"The following paths have been modified: \n{pretty_paths}")
-    if not no_confirm and click.confirm("show diff ?"):
-        cmd = ["git", "diff"]
-        cmd.extend([str(p) for p in modified_paths])
-        subprocess.run(cmd, cwd=galaxy_root)
     if build_packages and upload_packages and (no_confirm or click.confirm("Upload packages to ?")):
         for package in packages:
             upload_package(package)
@@ -673,6 +666,7 @@ def create_point_release(
     if not no_confirm:
         click.confirm("Stage and commit changes ?", abort=True)
     cmd = ["git", "add"]
+    changed_paths = [str(p) for p in modified_paths]
     cmd.extend(changed_paths)
     release_tag = f"v{new_version}"
     subprocess.run(cmd, cwd=galaxy_root)
@@ -750,6 +744,17 @@ def update_packages(
         if build_packages:
             build_package(package)
         modified_paths.extend(package.modified_paths)
+
+
+def show_modified_paths_and_diff(galaxy_root: pathlib.Path, modified_paths: List[pathlib.Path], no_confirm: bool):
+    """Show modified paths, optionally run git diff."""
+    modified_paths_str = [str(p) for p in modified_paths]
+    pretty_paths = "\n".join(modified_paths_str)
+    click.echo(f"The following paths have been modified: \n{pretty_paths}")
+    if not no_confirm and click.confirm("show diff ?"):
+        cmd = ["git", "diff"]
+        cmd.extend(modified_paths_str)
+        subprocess.run(cmd, cwd=galaxy_root)
 
 
 if __name__ == "__main__":
