@@ -668,10 +668,7 @@ def create_point_release(
     stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
 
     merge_changes_into_newer_branches(galaxy_root, packages, newer_branches, base_branch, no_confirm)
-
-    references = [release_tag] + all_branches
-    if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
-        push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
+    run_push_references(galaxy_root, release_tag, all_branches, upstream, no_confirm)
 
 
 def check_galaxy_repo_is_clean(galaxy_root: pathlib.Path):
@@ -789,6 +786,14 @@ def merge_changes_into_newer_branches(
         click.echo(f"Merging {base_branch} into {new_branch}")
         merge_and_resolve_branches(galaxy_root, current_branch, new_branch, packages)
         current_branch = new_branch
+
+
+def run_push_references(
+    galaxy_root: pathlib.Path, release_tag: str, branches: List[str], upstream: str, no_confirm: bool
+) -> None:
+    references = [release_tag] + branches
+    if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
+        push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
 
 
 if __name__ == "__main__":
