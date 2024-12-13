@@ -723,10 +723,9 @@ def load_packages(galaxy_root: pathlib.Path, package_subset: List[str], last_com
 def update_packages(packages: List[Package], new_version: Version, modified_paths: List[pathlib.Path]) -> None:
     """Update package versions and changelog files."""
     for package in packages:
-        if new_version:
-            bump_package_version(package, new_version)
-            update_package_history(package, new_version)
-            package.write_history()
+        bump_package_version(package, new_version)
+        update_package_history(package, new_version)
+        package.write_history()
         modified_paths.extend(package.modified_paths)
 
 
