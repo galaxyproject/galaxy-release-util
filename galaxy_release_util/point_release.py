@@ -659,20 +659,9 @@ def create_point_release(
     update_packages(packages, new_version, build_packages, modified_paths)
     show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
     run_upload_packages(build_packages, upload_packages, no_confirm, packages)
-
-    # stage changes, commit and tag
-    if not no_confirm:
-        click.confirm("Stage and commit changes ?", abort=True)
-    cmd = ["git", "add"]
-    changed_paths = [str(p) for p in modified_paths]
-    cmd.extend(changed_paths)
     release_tag = f"v{new_version}"
-    subprocess.run(cmd, cwd=galaxy_root)
-    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"], cwd=galaxy_root)
-    if not no_confirm:
-        click.confirm(f"Create git tag '{release_tag}'?", abort=True)
+    stage_changes_commit_and_tag(galaxy_root, new_version, modified_paths, release_tag, no_confirm)
 
-    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
     dev_version = get_next_devN_version(galaxy_root)
     version_py = set_root_version(version_py, dev_version)
     modified_paths = [version_py]
@@ -759,6 +748,26 @@ def run_upload_packages(build_packages: bool, upload_packages: bool, no_confirm:
     if build_packages and upload_packages and (no_confirm or click.confirm("Upload packages to ?")):
         for package in packages:
             upload_package(package)
+
+
+def stage_changes_commit_and_tag(
+    galaxy_root: pathlib.Path,
+    new_version: Version,
+    modified_paths: List[pathlib.Path],
+    release_tag: str,
+    no_confirm: bool,
+):
+    """Stage changes, commit and tag."""
+    if not no_confirm:
+        click.confirm("Stage and commit changes ?", abort=True)
+    cmd = ["git", "add"]
+    changed_paths = [str(p) for p in modified_paths]
+    cmd.extend(changed_paths)
+    subprocess.run(cmd, cwd=galaxy_root)
+    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"], cwd=galaxy_root)
+    if not no_confirm:
+        click.confirm(f"Create git tag '{release_tag}'?", abort=True)
+    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
 
 
 if __name__ == "__main__":
