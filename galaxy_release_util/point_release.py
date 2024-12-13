@@ -656,7 +656,8 @@ def create_point_release(
 
     packages = load_packages(galaxy_root, package_subset, last_commit)
     commits_to_prs(packages)
-    update_packages(packages, new_version, build_packages, modified_paths)
+    update_packages(packages, new_version, modified_paths)
+    run_build_packages(build_packages, packages)
     show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
     run_upload_packages(build_packages, upload_packages, no_confirm, packages)
     release_tag = f"v{new_version}"
@@ -720,16 +721,12 @@ def load_packages(galaxy_root: pathlib.Path, package_subset: List[str], last_com
     return packages
 
 
-def update_packages(
-    packages: List[Package], new_version: Version, build_packages: bool, modified_paths: List[pathlib.Path]
-) -> None:
+def update_packages(packages: List[Package], new_version: Version, modified_paths: List[pathlib.Path]) -> None:
     """Update package versions and changelog files."""
     for package in packages:
         if new_version:
             bump_package_version(package, new_version)
             update_package_history(package, new_version)
-        if build_packages:
-            build_package(package)
         modified_paths.extend(package.modified_paths)
 
 
@@ -742,6 +739,12 @@ def show_modified_paths_and_diff(galaxy_root: pathlib.Path, modified_paths: List
         cmd = ["git", "diff"]
         cmd.extend(modified_paths_str)
         subprocess.run(cmd, cwd=galaxy_root)
+
+
+def run_build_packages(build_packages: bool, packages: List[Package]) -> None:
+    if build_packages:
+        for package in packages:
+            build_package(package)
 
 
 def run_upload_packages(build_packages: bool, upload_packages: bool, no_confirm: bool, packages: List[Package]):
