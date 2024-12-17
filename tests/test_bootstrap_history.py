@@ -90,6 +90,7 @@ def test_create_changelog(
     prs_file,
     next_release_announcement_file,
 ):
+    monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
     monkeypatch.setattr(
         bootstrap_history, "_load_prs", lambda x, y, z: None
     )  # We don't want to call github's API on test data.

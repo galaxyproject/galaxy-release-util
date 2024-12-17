@@ -1,11 +1,11 @@
 import datetime
-import pathlib
 import re
 import subprocess
 from dataclasses import (
     dataclass,
     field,
 )
+from pathlib import Path
 from typing import (
     Dict,
     List,
@@ -32,6 +32,10 @@ from .github_client import github_client
 from .metadata import (
     _text_target,
     strip_release,
+)
+from .util import (
+    verify_galaxy_root,
+    version_filepath,
 )
 
 g = github_client()
@@ -88,11 +92,11 @@ class ChangelogItem:
 
 @dataclass
 class Package:
-    path: pathlib.Path
+    path: Path
     current_version: str
     commits: Set[str] = field(default_factory=set)
     prs: Set[PullRequest.PullRequest] = field(default_factory=set)
-    modified_paths: List[pathlib.Path] = field(default_factory=list)
+    modified_paths: List[Path] = field(default_factory=list)
     package_history: List[ChangelogItem] = field(default_factory=list)
     release_items: List[ReleaseItem] = field(default_factory=list)
 
@@ -101,11 +105,11 @@ class Package:
         return self.path.name
 
     @property
-    def setup_cfg(self) -> pathlib.Path:
+    def setup_cfg(self) -> Path:
         return self.path / "setup.cfg"
 
     @property
-    def history_rst(self) -> pathlib.Path:
+    def history_rst(self) -> Path:
         return self.path / "HISTORY.rst"
 
     @property
@@ -138,14 +142,14 @@ class Package:
         return pretty_string
 
 
-def get_sorted_package_paths(galaxy_root: pathlib.Path) -> List[pathlib.Path]:
+def get_sorted_package_paths(galaxy_root: Path) -> List[Path]:
     root_package_path = galaxy_root.joinpath("packages")
     sorted_packages = root_package_path.joinpath("packages_by_dep_dag.txt").read_text().splitlines()
     # Ignore empty lines and lines beginning with "#"
     return [root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")]
 
 
-def read_package(package_path: pathlib.Path) -> Package:
+def read_package(package_path: Path) -> Package:
     setup_cfg = package_path / "setup.cfg"
     package = None
     with setup_cfg.open() as content:
@@ -227,7 +231,7 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
     )
 
 
-def bump_package_version(package: Package, new_version: Version):
+def bump_package_version(package: Package, new_version: Version) -> None:
     new_content = []
     content = package.setup_cfg.read_text().splitlines()
     for line in content:
@@ -238,7 +242,7 @@ def bump_package_version(package: Package, new_version: Version):
     package.modified_paths.append(package.setup_cfg)
 
 
-def get_commits_since_last_version(package: Package, last_version_tag: str):
+def get_commits_since_last_version(package: Package, last_version_tag: str) -> Set[str]:
     click.echo(f"finding commits to package {package.name} made since {last_version_tag}")
     package_source_paths = []
     commits = set()
@@ -265,21 +269,29 @@ def get_commits_since_last_version(package: Package, last_version_tag: str):
             capture_output=True,
             text=True,
         )
-        result.check_returncode()
+        try:
+            result.check_returncode()
+        except subprocess.CalledProcessError as err:
+            if "unknown revision" in result.stderr:
+                raise Exception(
+                    f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier"
+                ) from err
+            raise err
+
         for line in result.stdout.splitlines():
             if line:
                 commits.add(line)
-    package.commits = commits
+    return commits
 
 
-def commits_to_prs(packages: List[Package]):
+def commits_to_prs(packages: List[Package]) -> None:
     commits = set.union(*(p.commits for p in packages))
     pr_cache = {}
     commit_to_pr = {}
     repo = g.get_repo(REPO)
     total_commits = len(commits)
     for i, commit in enumerate(commits):
-        click.echo(f"Processing commit {i} of {total_commits}")
+        click.echo(f"Processing commit {i + 1} of {total_commits}")
         # Get the list of pull requests associated with the commit
         commit_obj = repo.get_commit(commit)
         prs = commit_obj.get_pulls()
@@ -294,7 +306,7 @@ def commits_to_prs(packages: List[Package]):
         package.prs = set(commit_to_pr[commit] for commit in package.commits if commit in commit_to_pr)
 
 
-def update_package_history(package: Package, new_version: Version):
+def get_package_history(package: Package, new_version: Version) -> ChangelogItem:
     sorted_and_formatted_changes = []
     changes: Dict[str, List[str]] = {
         "Bug fixes": [],
@@ -327,14 +339,10 @@ def update_package_history(package: Package, new_version: Version):
         sorted_and_formatted_changes.extend(entries)
 
     now = datetime.datetime.now().strftime("%Y-%m-%d")
-    package.package_history.insert(
-        0,
-        ChangelogItem(version=new_version, changes=sorted_and_formatted_changes, date=now),
-    )
-    package.write_history()
+    return ChangelogItem(version=new_version, changes=sorted_and_formatted_changes, date=now)
 
 
-def build_package(package: Package):
+def build_package(package: Package) -> None:
     click.echo(f"Running make clean for package {package.name}")
     subprocess.run(["make", "clean"], cwd=package.path).check_returncode()
     click.echo(f"running make dist for package {package.name}")
@@ -343,7 +351,7 @@ def build_package(package: Package):
     subprocess.run(["make", "lint-dist"], cwd=package.path).check_returncode()
 
 
-def upload_package(package: Package):
+def upload_package(package: Package) -> None:
     click.echo(f"uploading package {package.name}")
     subprocess.run(
         ["twine", "upload", "--skip-existing"]
@@ -352,8 +360,8 @@ def upload_package(package: Package):
     ).check_returncode()
 
 
-def get_root_version(galaxy_root: pathlib.Path) -> Version:
-    version_py = galaxy_root / "lib" / "galaxy" / "version.py"
+def get_root_version(galaxy_root: Path) -> Version:
+    version_py = version_filepath(galaxy_root)
     version_py_contents = version_py.read_text().splitlines()
     assert len(version_py_contents) == 3
     major_version = version_py_contents[0].split('"')[1]
@@ -361,19 +369,18 @@ def get_root_version(galaxy_root: pathlib.Path) -> Version:
     return Version(f"{major_version}.{minor_version}")
 
 
-def set_root_version(galaxy_root: pathlib.Path, new_version: Version) -> pathlib.Path:
+def set_root_version(version_py: Path, new_version: Version) -> Path:
     major_galaxy_release_string = f"{new_version.major}.{new_version.minor}"
     minor_galaxy_release_string = str(new_version).replace(f"{major_galaxy_release_string}.", "")
     VERSION_PY_TEMPLATE = f"""VERSION_MAJOR = "{major_galaxy_release_string}"
 VERSION_MINOR = "{minor_galaxy_release_string}"
 VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
 """
-    version_py = galaxy_root / "lib" / "galaxy" / "version.py"
     version_py.write_text(VERSION_PY_TEMPLATE)
     return version_py
 
 
-def is_git_clean(galaxy_root: pathlib.Path):
+def is_git_clean(galaxy_root: Path) -> bool:
     click.echo(f"Making sure galaxy clone at '{galaxy_root}' is clean:")
     command = ["git", "diff-index", "--quiet", "HEAD"]
     result = subprocess.run(command, capture_output=True, text=True, cwd=galaxy_root)
@@ -387,14 +394,14 @@ def is_git_clean(galaxy_root: pathlib.Path):
         return False
 
 
-def get_current_branch(galaxy_root):
+def get_current_branch(galaxy_root) -> str:
     current_branch_cmd = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
     result = subprocess.run(current_branch_cmd, cwd=galaxy_root, capture_output=True, text=True)
     result.check_returncode()
     return result.stdout.strip()
 
 
-def get_branches(galaxy_root: pathlib.Path, new_version: Version, current_branch: str):
+def get_branches(galaxy_root: Path, new_version: Version, current_branch: str) -> List[str]:
     """
     Tries to get release and dev branches that we need to merge forward to.
     """
@@ -417,11 +424,11 @@ def get_branches(galaxy_root: pathlib.Path, new_version: Version, current_branch
 
 
 def merge_and_resolve_branches(
-    galaxy_root: pathlib.Path,
+    galaxy_root: Path,
     base_branch: str,
     new_branch: str,
     packages: List[Package],
-):
+) -> None:
     checkout_cmd = ["git", "checkout", new_branch]
     subprocess.run(checkout_cmd, cwd=galaxy_root).check_returncode()
 
@@ -442,7 +449,7 @@ def merge_and_resolve_branches(
             "git",
             "checkout",
             new_branch,
-            str(galaxy_root / "lib" / "galaxy" / "version.py"),
+            str(version_filepath(galaxy_root)),
         ],
         cwd=galaxy_root,
     )
@@ -497,7 +504,7 @@ def get_next_devN_version(galaxy_root) -> Version:
     return Version(f"{root_version.major}.{minor_version}.{micro_version}.dev{dev_version}")
 
 
-def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Path):
+def is_merge_required(base_branch: str, new_branch: str, galaxy_root: Path) -> bool:
     subprocess.run(["git", "checkout", new_branch], cwd=galaxy_root).check_returncode()
     process = subprocess.run(
         ["git", "merge", "--no-commit", "--no-ff", base_branch],
@@ -511,33 +518,50 @@ def is_merge_required(base_branch: str, new_branch: str, galaxy_root: pathlib.Pa
     return True
 
 
-def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: pathlib.Path):
-    for branch in branches:
-        subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
-        # Check that the head commit matches the commit for the same branch at the specified remote repo url
-        result = subprocess.run(
-            ["git", "ls-remote", upstream, f"refs/heads/{branch}"],
-            cwd=galaxy_root,
-            capture_output=True,
-            text=True,
-        )
-        result.check_returncode()
-        remote_commit_hash = result.stdout.split("\t")[0]
-        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=galaxy_root, capture_output=True, text=True)
-        result.check_returncode()
-        local_commit_hash = result.stdout.strip()
-        if remote_commit_hash != local_commit_hash:
-            raise Exception(
-                f"Local tip of branch {branch} is {local_commit_hash}, remote tip of branch is {remote_commit_hash}. Make sure that your local branches are up to date and track f{upstream}."
+def ensure_branches_up_to_date(branches: List[str], base_branch: str, upstream: str, galaxy_root: Path) -> None:
+    click.echo("Making sure that all branches are up to date")
+    try:
+        for branch in branches:
+            subprocess.run(["git", "checkout", branch], cwd=galaxy_root).check_returncode()
+            # Check that the head commit matches the commit for the same branch at the specified remote repo url
+            result = subprocess.run(
+                ["git", "ls-remote", upstream, f"refs/heads/{branch}"],
+                cwd=galaxy_root,
+                capture_output=True,
+                text=True,
             )
-    subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
+            result.check_returncode()
+            remote_commit_hash = result.stdout.split("\t")[0]
+            result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=galaxy_root, capture_output=True, text=True)
+            result.check_returncode()
+            local_commit_hash = result.stdout.strip()
+            if remote_commit_hash != local_commit_hash:
+                raise Exception(
+                    f"Local tip of branch {branch} is {local_commit_hash}, remote tip of branch is {remote_commit_hash}. Make sure that your local branches are up to date and track f{upstream}."
+                )
+    finally:
+        if branch != base_branch:
+            subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
-def push_references(
-    references: List[str], galaxy_root: pathlib.Path, upstream: str = "https://github.com/galaxyproject/galaxy.git"
-):
-    for reference in references:
-        subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
+def ensure_clean_merges(newer_branches: List[str], base_branch: str, galaxy_root: Path, no_confirm: bool) -> None:
+    click.echo("Making sure that merging forward will result in clean merges")
+    current_branch = base_branch
+    try:
+        for new_branch in newer_branches:
+            merge_required = is_merge_required(
+                base_branch=current_branch, new_branch=new_branch, galaxy_root=galaxy_root
+            )
+            if merge_required:
+                msg = f"Merge conflicts occurred while attempting to merge branch {current_branch} into {new_branch}. You should resolve conflicts and try again."
+                if no_confirm:
+                    raise Exception(msg)
+                click.echo(msg)
+                if click.confirm("Continue anyway ?", abort=True):
+                    current_branch = new_branch
+                    break
+    finally:
+        subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
 
 
 @click.group(help="Subcommands of this script can create new releases and build and upload package artifacts")
@@ -559,7 +583,7 @@ no_confirm_option = click.option("--no-confirm", type=bool, is_flag=True, defaul
 @group_options(galaxy_root_option, packages_option, no_confirm_option)
 @cli.command("build-and-upload", help="Build and upload packages")
 def build_and_upload(
-    galaxy_root: pathlib.Path,
+    galaxy_root: Path,
     package_subset: List[str],
     no_confirm: bool,
 ):
@@ -584,18 +608,20 @@ def build_and_upload(
     "--new-version",
     type=ClickVersion(),
     help="Specify new release version. Must be valid PEP 440 version",
+    required=True,
 )
 @click.option(
     "--last-commit",
     type=str,
     help="Specify commit or tag that was used for the last package release. This is used to find the changelog for packages.",
+    required=True,
 )
 @click.option("--build-packages/--no-build-packages", type=bool, is_flag=True, default=True)
 @click.option("--upload-packages", type=bool, is_flag=True, default=False)
 @click.option("--upstream", type=str, default=DEFAULT_UPSTREAM_URL)
 @group_options(packages_option, no_confirm_option)
 def create_point_release(
-    galaxy_root: pathlib.Path,
+    galaxy_root: Path,
     new_version: Version,
     build_packages: bool,
     last_commit: str,
@@ -604,91 +630,145 @@ def create_point_release(
     no_confirm: bool,
     upstream: str,
 ):
-    # Update version.py
+    verify_galaxy_root(galaxy_root)
+    check_galaxy_repo_is_clean(galaxy_root)
+    base_branch = get_current_branch(galaxy_root)
+    user_confirmation(galaxy_root, new_version, base_branch, no_confirm)
+    newer_branches = get_branches(galaxy_root, new_version, base_branch)
+    all_branches = newer_branches + [base_branch]
+    ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
+    ensure_clean_merges(newer_branches, base_branch, galaxy_root, no_confirm)
+    version_py = version_filepath(galaxy_root)
+
+    set_root_version(version_py, new_version)
+    modified_paths = [version_py]
+    packages = load_packages(galaxy_root, package_subset, last_commit)
+    commits_to_prs(packages)
+    update_packages(packages, new_version, modified_paths)
+    run_build_packages(build_packages, packages)
+    show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
+    run_upload_packages(build_packages, upload_packages, no_confirm, packages)
+    commit_message = f"Create version {new_version}"
+    stage_changes_and_commit(galaxy_root, new_version, modified_paths, commit_message, no_confirm)
+    release_tag = f"v{new_version}"
+    create_tag(galaxy_root, release_tag, no_confirm)
+
+    dev_version = get_next_devN_version(galaxy_root)
+    set_root_version(version_py, dev_version)
+    modified_paths = [version_py]
+    update_packages(packages, dev_version, modified_paths, is_dev_version=True)
+    commit_message = f"Start work on {dev_version}"
+    stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
+
+    merge_changes_into_newer_branches(galaxy_root, packages, newer_branches, base_branch, no_confirm)
+    push_references(galaxy_root, release_tag, all_branches, upstream, no_confirm)
+
+
+def check_galaxy_repo_is_clean(galaxy_root: Path) -> None:
     if not is_git_clean(galaxy_root):
         click.confirm(
-            "Your galaxy clone has untracked or staged changes, are you sure you want to continue ?",
+            "Your galaxy clone has untracked or staged changes, are you sure you want to continue?",
             abort=True,
         )
+
+
+def user_confirmation(galaxy_root: Path, new_version: Version, base_branch: str, no_confirm: bool) -> None:
     root_version = get_root_version(galaxy_root)
-    base_branch = current_branch = get_current_branch(galaxy_root)
     click.echo(
         f"- Current Galaxy version: {root_version}\n- New Galaxy version: {new_version}\n- Base branch: {base_branch}"
     )
     if not no_confirm:
         click.confirm("Does this look correct?", abort=True)
-    newer_branches = get_branches(galaxy_root, new_version, base_branch)
-    all_branches = newer_branches + [base_branch]
-    click.echo("Making sure that all branches are up to date")
-    ensure_branches_up_to_date(all_branches, base_branch, upstream, galaxy_root)
 
-    click.echo("Making sure that merging forward will result in clean merges")
-    for new_branch in newer_branches:
-        merge_required = is_merge_required(base_branch=current_branch, new_branch=new_branch, galaxy_root=galaxy_root)
-        if merge_required:
-            msg = f"Merge conflicts occurred while attempting to merge branch {current_branch} into {new_branch}. You should resolve conflicts and try again."
-            if no_confirm:
-                raise Exception(msg)
-            click.echo(msg)
-            if click.confirm("Continue anyway ?", abort=True):
-                current_branch = new_branch
-                break
-    subprocess.run(["git", "checkout", base_branch], cwd=galaxy_root).check_returncode()
-    modified_paths = [set_root_version(galaxy_root, new_version)]
-    # read packages and find prs that affect a package
+
+def load_packages(galaxy_root: Path, package_subset: List[str], last_commit: str) -> List[Package]:
+    """Read packages and find prs that affect a package."""
     packages: List[Package] = []
     for package_path in get_sorted_package_paths(galaxy_root):
         if package_subset and package_path.name not in package_subset:
             continue
         package = read_package(package_path)
         packages.append(package)
-        get_commits_since_last_version(package, last_commit)
-    commits_to_prs(packages)
-    # update package versions and changelog files
+        package.commits = get_commits_since_last_version(package, last_commit)
+    return packages
+
+
+def update_packages(
+    packages: List[Package], new_version: Version, modified_paths: List[Path], is_dev_version: bool = False
+) -> None:
+    """Update package versions and changelog files."""
     for package in packages:
-        if new_version:
-            bump_package_version(package, new_version)
-            update_package_history(package, new_version)
-        if build_packages:
-            build_package(package)
+        bump_package_version(package, new_version)
+
+        if not is_dev_version:
+            changelog_item = get_package_history(package, new_version)
+        else:
+            changelog_item = ChangelogItem(version=new_version, changes=[], date=None)
+        package.package_history.insert(0, changelog_item)
+
+        package.write_history()
         modified_paths.extend(package.modified_paths)
-    # show changed paths, optionally run git diff
-    changed_paths = [str(p) for p in modified_paths]
-    pretty_paths = "\n".join(changed_paths)
+
+
+def show_modified_paths_and_diff(galaxy_root: Path, modified_paths: List[Path], no_confirm: bool) -> None:
+    """Show modified paths, optionally run git diff."""
+    modified_paths_str = [str(p) for p in modified_paths]
+    pretty_paths = "\n".join(modified_paths_str)
     click.echo(f"The following paths have been modified: \n{pretty_paths}")
     if not no_confirm and click.confirm("show diff ?"):
         cmd = ["git", "diff"]
-        cmd.extend([str(p) for p in modified_paths])
+        cmd.extend(modified_paths_str)
         subprocess.run(cmd, cwd=galaxy_root)
+
+
+def run_build_packages(build_packages: bool, packages: List[Package]) -> None:
+    if build_packages:
+        for package in packages:
+            build_package(package)
+
+
+def run_upload_packages(build_packages: bool, upload_packages: bool, no_confirm: bool, packages: List[Package]):
     if build_packages and upload_packages and (no_confirm or click.confirm("Upload packages to ?")):
         for package in packages:
             upload_package(package)
-    # stage changes, commit and tag
+
+
+def stage_changes_and_commit(
+    galaxy_root: Path,
+    new_version: Version,
+    modified_paths: List[Path],
+    commit_message: str,
+    no_confirm: bool,
+) -> None:
+    """Stage changes and commit."""
     if not no_confirm:
         click.confirm("Stage and commit changes ?", abort=True)
+
     cmd = ["git", "add"]
+    changed_paths = [str(p) for p in modified_paths]
     cmd.extend(changed_paths)
-    release_tag = f"v{new_version}"
     subprocess.run(cmd, cwd=galaxy_root)
-    subprocess.run(["git", "commit", "-m" f"Create version {new_version}"], cwd=galaxy_root)
+
+    subprocess.run(["git", "commit", "-m", commit_message], cwd=galaxy_root)
+
+
+def create_tag(galaxy_root: Path, release_tag: str, no_confirm: bool) -> None:
     if not no_confirm:
         click.confirm(f"Create git tag '{release_tag}'?", abort=True)
-
     subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
-    dev_version = get_next_devN_version(galaxy_root)
-    version_py = set_root_version(galaxy_root, dev_version)
-    modified_paths = [version_py]
-    for package in packages:
-        bump_package_version(package, dev_version)
-        package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
-        package.write_history()
-        modified_paths.extend(package.modified_paths)
-    cmd = ["git", "add"]
-    cmd.extend([str(p) for p in modified_paths])
-    subprocess.run(cmd, cwd=galaxy_root)
-    subprocess.run(["git", "commit", "-m", f"Start work on {dev_version}"], cwd=galaxy_root)
-    # merge changes into newer branches
-    # special care needs to be taken for changelog files
+
+
+def merge_changes_into_newer_branches(
+    galaxy_root: Path,
+    packages: List[Package],
+    newer_branches: List[str],
+    base_branch: str,
+    no_confirm: bool,
+) -> None:
+    """
+    Merge changes into newer branches.
+    Special care needs to be taken for changelog files.
+    """
     if not no_confirm and newer_branches:
         click.confirm(
             f"Merge branch '{base_branch}' into {', '.join(newer_branches)} ?",
@@ -699,9 +779,13 @@ def create_point_release(
         click.echo(f"Merging {base_branch} into {new_branch}")
         merge_and_resolve_branches(galaxy_root, current_branch, new_branch, packages)
         current_branch = new_branch
-    references = [release_tag] + all_branches
+
+
+def push_references(galaxy_root: Path, release_tag: str, branches: List[str], upstream: str, no_confirm: bool) -> None:
+    references = [release_tag] + branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
-        push_references(references=references, galaxy_root=galaxy_root, upstream=upstream)
+        for reference in references:
+            subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
 
 
 if __name__ == "__main__":
