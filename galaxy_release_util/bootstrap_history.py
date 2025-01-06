@@ -102,8 +102,7 @@ Feature3
 
 Feature description.
 
-Also check out the `${release} user release notes <${release}_announce_user.html>`__.
-Are you an admin? Check out `some admin relevant PRs <https://github.com/galaxyproject/galaxy/pulls?q=label%3Ahighlight%2Fadmin+milestone%3A${release}+is%3Aclosed+is%3Apr>`__.
+Please see the `${release} user release notes <${release}_announce_user.html>`__ for a summary of new user features.
 
 Get Galaxy
 ===========================================================
@@ -123,7 +122,7 @@ To update an existing Galaxy repository run:
 See the `community hub <https://galaxyproject.org/develop/source-code/>`__ for additional details on source code locations.
 
 
-Administration Notes
+Admin Notes
 ===========================================================
 Add content or drop section.
 
@@ -135,11 +134,33 @@ Deprecation Notices
 ===========================================================
 Add content or drop section.
 
+Developer Notes
+===========================================================
+Add content or drop section.
+
 Release Notes
 ===========================================================
 
 .. include:: ${release}.rst
    :start-after: announce_start
+
+Release Team
+===========================================================
+
+Release manager:  `[NAME] <https://github.com/[GITHUB-USERNAME]>`__
+
+Release testing:
+
+* `[NAME] <https://github.com/[GITHUB-USERNAME]>`__
+* ...
+
+Communications:
+
+* `[NAME] <https://github.com/[GITHUB-USERNAME]>`__
+
+A special thank you goes to everyone who helped test the new release after its deployment on usegalaxy.org.
+
+----
 
 .. include:: _thanks.rst
 """  # noqa: E501
@@ -152,6 +173,8 @@ ${release} Galaxy Release (${month_name} ${year})
 ===========================================================
 
 .. include:: _header.rst
+
+Please see the full :doc:`${release} release notes <${release}_announce>` for more details.
 
 Highlights
 ===========================================================
@@ -187,19 +210,11 @@ Builtin Tool Updates
 
 .. tools
 
-Release Testing Team
-===========================================================
-
-A special thanks to the release testing team for testing many of the new features and reporting many bugs:
-
-<team members go here>
-
-Release Notes
-===========================================================
-
-Please see the :doc:`full release notes <${release}_announce>` for more details.
+Please see the full :doc:`${release} release notes <${release}_announce>` for more details.
 
 .. include:: ${release}_prs.rst
+
+----
 
 .. include:: _thanks.rst
 """  # noqa: E501
