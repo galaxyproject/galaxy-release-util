@@ -23,8 +23,7 @@ Feature3
 
 Feature description.
 
-Also check out the `98.2 user release notes <98.2_announce_user.html>`__.
-Are you an admin? Check out `some admin relevant PRs <https://github.com/galaxyproject/galaxy/pulls?q=label%3Ahighlight%2Fadmin+milestone%3A98.2+is%3Aclosed+is%3Apr>`__.
+Please see the `98.2 user release notes <98.2_announce_user.html>`__ for a summary of new user features.
 
 Get Galaxy
 ===========================================================
@@ -44,7 +43,7 @@ To update an existing Galaxy repository run:
 See the `community hub <https://galaxyproject.org/develop/source-code/>`__ for additional details on source code locations.
 
 
-Administration Notes
+Admin Notes
 ===========================================================
 Add content or drop section.
 
@@ -56,10 +55,32 @@ Deprecation Notices
 ===========================================================
 Add content or drop section.
 
+Developer Notes
+===========================================================
+Add content or drop section.
+
 Release Notes
 ===========================================================
 
 .. include:: 98.2.rst
    :start-after: announce_start
+
+Release Team
+===========================================================
+
+Release manager:  `[NAME] <https://github.com/[GITHUB-USERNAME]>`__
+
+Release testing:
+
+* `[NAME] <https://github.com/[GITHUB-USERNAME]>`__
+* ...
+
+Communications:
+
+* `[NAME] <https://github.com/[GITHUB-USERNAME]>`__
+
+A special thank you goes to everyone who helped test the new release after its deployment on usegalaxy.org.
+
+----
 
 .. include:: _thanks.rst
