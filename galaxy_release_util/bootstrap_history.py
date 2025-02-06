@@ -332,7 +332,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create and push release tag:
 
-          make release-create
+          galaxy-release-util create-release --new-version ${version}.0 --last-commit [insert latest tag, e.g. v24.1.4]
 
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
     - [ ] Open PR against planemo with a pin to the new packages
