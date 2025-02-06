@@ -326,14 +326,13 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
           galaxy-release-util check-blocking-prs ${version} --release-date ${release_date}
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze have [milestones attached](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+no%3Amilestone)
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are the not [${next_version} milestones](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
-    - [ ] Ensure there are no blocking pull requests that target the `release_${version}` branch but [do not have the `${version}` milestone attached](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+base%3Arelease_${version}+-label%3Akind%2Fbug+-milestone%3A${version}).
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
           galaxy-release-util create-changelog ${version} --release-date ${release_date} --next-version ${next_version}
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create and push release tag:
 
-          make release-create
+          galaxy-release-util create-release --new-version ${version}.0 --last-commit [insert latest tag, e.g. v24.1.4]
 
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
     - [ ] Open PR against planemo with a pin to the new packages

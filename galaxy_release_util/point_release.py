@@ -11,6 +11,7 @@ from typing import (
     List,
     Optional,
     Set,
+    Tuple,
 )
 
 import click
@@ -370,14 +371,23 @@ def get_root_version(galaxy_root: Path) -> Version:
 
 
 def set_root_version(version_py: Path, new_version: Version) -> Path:
-    major_galaxy_release_string = f"{new_version.major}.{new_version.minor}"
-    minor_galaxy_release_string = str(new_version).replace(f"{major_galaxy_release_string}.", "")
+    major_galaxy_release_string, minor_galaxy_release_string = get_major_minor_version_strings(new_version)
     VERSION_PY_TEMPLATE = f"""VERSION_MAJOR = "{major_galaxy_release_string}"
 VERSION_MINOR = "{minor_galaxy_release_string}"
 VERSION = VERSION_MAJOR + (f".{{VERSION_MINOR}}" if VERSION_MINOR else "")
 """
     version_py.write_text(VERSION_PY_TEMPLATE)
     return version_py
+
+
+def get_major_minor_version_strings(version: Version) -> Tuple[str, str]:
+    major_galaxy_release_string = f"{version.major}.{version.minor}"
+    # use "0" if minor version and/or point version was not specified
+    if str(version) == str(version.major) or str(version) == major_galaxy_release_string:
+        minor_galaxy_release_string = "0"
+    else:
+        minor_galaxy_release_string = str(version).replace(f"{major_galaxy_release_string}.", "")
+    return major_galaxy_release_string, minor_galaxy_release_string
 
 
 def is_git_clean(galaxy_root: Path) -> bool:
