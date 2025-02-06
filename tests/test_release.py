@@ -1,8 +1,10 @@
 import pathlib
 
 import pytest
+from packaging.version import Version
 
 from galaxy_release_util.point_release import (
+    get_major_minor_version_strings,
     get_next_devN_version,
     get_root_version,
     get_sorted_package_paths,
@@ -56,3 +58,20 @@ def test_get_sorted_package_paths(galaxy_root):
     assert packages[0].name == "foo"
     assert packages[1].name == "bar"
     assert packages[2].name == "baz"
+
+
+def test_get_major_minor_version_strings():
+    version = Version("21.2.3")
+    major, minor = get_major_minor_version_strings(version)
+    assert major == "21.2"
+    assert minor == "3"
+
+    version = Version("21.2")
+    major, minor = get_major_minor_version_strings(version)
+    assert major == "21.2"
+    assert minor == "0"
+
+    version = Version("21")
+    major, minor = get_major_minor_version_strings(version)
+    assert major == "21.0"
+    assert minor == "0"
