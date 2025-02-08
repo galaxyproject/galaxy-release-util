@@ -233,13 +233,9 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
 
 
 def bump_package_version(package: Package, new_version: Version) -> None:
-    new_content = []
     content = package.setup_cfg.read_text().splitlines()
-    for line in content:
-        if line.startswith("version = "):
-            line = f"version = {new_version}"
-        new_content.append(line)
-    package.setup_cfg.write_text("\n".join(new_content))
+    new_content = [f"version = {new_version}" if line.startswith("version = ") else line for line in content]
+    package.setup_cfg.write_text("\n".join(new_content) + "\n")
     package.modified_paths.append(package.setup_cfg)
 
 
