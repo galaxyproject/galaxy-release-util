@@ -267,6 +267,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Deploy and Test Release on galaxy-test**
 
     - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
+    - [ ] Request that testtoolshed.g2.bx.psu.edu is updated to ``${version}``.
     - [ ] Conduct formal release testing on test.galaxyproject.org (see ${version} release testing plan).
     - [ ] Ensure all critical bugs detected during release testing have been fixed.
 
@@ -308,6 +309,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 - [ ] **Deploy and Test Release on galaxy-main**
     - [ ] Update usegalaxy.org to ensure it is running the ``release_${version}`` branch.
+    - [ ] Request that toolshed.g2.bx.psu.edu is updated to ``${version}``.
     - [ ] Conduct second stage of release testing on usegalaxy.org.
     - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
     - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
