@@ -54,10 +54,11 @@ def test_get_next_devN_version(galaxy_root):
 
 def test_get_sorted_package_paths(galaxy_root):
     packages = get_sorted_package_paths(galaxy_root)
-    assert len(packages) == 3
+    assert len(packages) == 4
     assert packages[0].name == "foo"
     assert packages[1].name == "bar"
     assert packages[2].name == "baz"
+    assert packages[3].name == "meta"
 
 
 def test_get_major_minor_version_strings():

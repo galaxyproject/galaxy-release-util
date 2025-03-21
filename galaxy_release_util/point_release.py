@@ -118,6 +118,10 @@ class Package:
         changelog_string = "\n".join(str(h) for h in self.package_history)
         return f"{HISTORY_TEMPLATE}{changelog_string}"
 
+    @property
+    def pinned_requirements_txt(self) -> Path:
+        return self.path / ".." / ".." / "lib" / "galaxy" / "dependencies" / "pinned-requirements.txt"
+
     def write_history(self):
         self.history_rst.write_text(self.changelog)
         self.modified_paths.append(self.history_rst)
@@ -146,8 +150,9 @@ class Package:
 def get_sorted_package_paths(galaxy_root: Path) -> List[Path]:
     root_package_path = galaxy_root.joinpath("packages")
     sorted_packages = root_package_path.joinpath("packages_by_dep_dag.txt").read_text().splitlines()
+    meta_package_path = root_package_path.joinpath("meta")
     # Ignore empty lines and lines beginning with "#"
-    return [root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")]
+    return [*(root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")), meta_package_path]
 
 
 def read_package(package_path: Path) -> Package:
@@ -714,6 +719,18 @@ def update_packages(
 
         package.write_history()
         modified_paths.extend(package.modified_paths)
+        if package.name == "meta" and not is_dev_version:
+            build_meta_dependencies(package, packages, new_version)
+
+
+def build_meta_dependencies(meta_package: Package, packages: List[Package], new_version: Version) -> None:
+    """Update meta package dependencies."""
+    meta_deps = [f"galaxy-{p.name}=={new_version}" for p in packages if not p.name == "meta"]
+    for line in meta_package.pinned_requirements_txt.read_text().splitlines():
+        if not line.startswith(("--", "#")):
+            meta_deps.append(line)
+    meta_deps.sort()
+    meta_package.path.joinpath("requirements.txt").write_text("\n".join(meta_deps))
 
 
 def show_modified_paths_and_diff(galaxy_root: Path, modified_paths: List[Path], no_confirm: bool) -> None:
