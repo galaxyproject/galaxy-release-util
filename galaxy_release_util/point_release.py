@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 import subprocess
 from dataclasses import (
@@ -656,6 +657,7 @@ def create_point_release(
     packages = load_packages(galaxy_root, package_subset, last_commit)
     commits_to_prs(packages)
     update_packages(packages, new_version, modified_paths)
+    update_client_version(galaxy_root, new_version)
     run_build_packages(build_packages, packages)
     show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
     run_upload_packages(build_packages, upload_packages, no_confirm, packages)
@@ -668,11 +670,18 @@ def create_point_release(
     set_root_version(version_py, dev_version)
     modified_paths = [version_py]
     update_packages(packages, dev_version, modified_paths, is_dev_version=True)
+    update_client_version(galaxy_root, dev_version)
     commit_message = f"Start work on {dev_version}"
     stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
 
     merge_changes_into_newer_branches(galaxy_root, packages, newer_branches, base_branch, no_confirm)
     push_references(galaxy_root, release_tag, all_branches, upstream, no_confirm)
+
+def update_client_version(galaxy_root: Path, new_version: Version) -> None:
+    package_json = galaxy_root.joinpath("client", "package.json")
+    package_json_dict = json.loads(package_json.read_text())
+    package_json_dict["version"] = str(new_version)
+    package_json.write_text(f"{json.dumps(package_json_dict, indent=2)}\n")
 
 
 def check_galaxy_repo_is_clean(galaxy_root: Path) -> None:
