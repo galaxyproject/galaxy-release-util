@@ -445,7 +445,7 @@ def merge_and_resolve_branches(
     subprocess.run(checkout_cmd, cwd=galaxy_root).check_returncode()
 
     package_paths = {p.path: p for p in packages}
-    packages_to_rewrite: List[Package] = []
+    packages_to_rewrite: List[Package] = [p for p in packages if p.name == "meta"]
     for package_path in get_sorted_package_paths(galaxy_root):
         if package_path not in package_paths:
             continue
