@@ -132,6 +132,9 @@ class Package:
 
     @property
     def code_paths(self) -> List[Path]:
+        if self.name == "meta":
+            # every commit is relevant:
+            return [self.path / ".." / ".."]
         package_code_paths = []
         for code_dir in ["galaxy", "tests", "galaxy_test"]:
             package_code_path = self.path / code_dir
