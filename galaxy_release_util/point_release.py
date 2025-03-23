@@ -131,6 +131,51 @@ class Package:
         self.release_items.append(item)
 
     @property
+    def code_paths(self) -> List[Path]:
+        package_code_paths = []
+        for code_dir in ["galaxy", "tests", "galaxy_test"]:
+            package_code_path = self.path / code_dir
+            if package_code_path.exists():
+                # get all symlinks pointing to a directory
+                for item in package_code_path.iterdir():
+                    # Check if the item is a symlink and if its target points to a directory
+                    if item.is_symlink() and item.resolve().is_dir():
+                        package_code_paths.append(item.resolve())
+        return package_code_paths
+
+    def get_commits_since_last_version(self, last_version_tag: str) -> Set[str]:
+        click.echo(f"finding commits to package {self.name} made since {last_version_tag}")
+        commits = set()
+        for package_source_path in self.code_paths:
+            result = subprocess.run(
+                [
+                    "git",
+                    "log",
+                    "--oneline",
+                    "--no-merges",
+                    "--pretty=format:%h",
+                    f"{last_version_tag}..HEAD",
+                    package_source_path,
+                ],
+                cwd=self.path,
+                capture_output=True,
+                text=True,
+            )
+            try:
+                result.check_returncode()
+            except subprocess.CalledProcessError as err:
+                if "unknown revision" in result.stderr:
+                    raise Exception(
+                        f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier"
+                    ) from err
+                raise err
+
+            for line in result.stdout.splitlines():
+                if line:
+                    commits.add(line)
+        return commits
+
+    @property
     def is_new(self) -> bool:
         """Package has not been released:
         - has only one release item,
@@ -243,48 +288,6 @@ def bump_package_version(package: Package, new_version: Version) -> None:
     new_content = [f"version = {new_version}" if line.startswith("version = ") else line for line in content]
     package.setup_cfg.write_text("\n".join(new_content) + "\n")
     package.modified_paths.append(package.setup_cfg)
-
-
-def get_commits_since_last_version(package: Package, last_version_tag: str) -> Set[str]:
-    click.echo(f"finding commits to package {package.name} made since {last_version_tag}")
-    package_source_paths = []
-    commits = set()
-    for code_dir in ["galaxy", "tests", "galaxy_test"]:
-        package_code_path = package.path / code_dir
-        if package_code_path.exists():
-            # get all symlinks pointing to a directory
-            for item in package_code_path.iterdir():
-                # Check if the item is a symlink and if its target points to a directory
-                if item.is_symlink() and item.resolve().is_dir():
-                    package_source_paths.append(item.resolve())
-    for package_source_path in package_source_paths:
-        result = subprocess.run(
-            [
-                "git",
-                "log",
-                "--oneline",
-                "--no-merges",
-                "--pretty=format:%h",
-                f"{last_version_tag}..HEAD",
-                package_source_path,
-            ],
-            cwd=package.path,
-            capture_output=True,
-            text=True,
-        )
-        try:
-            result.check_returncode()
-        except subprocess.CalledProcessError as err:
-            if "unknown revision" in result.stderr:
-                raise Exception(
-                    f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier"
-                ) from err
-            raise err
-
-        for line in result.stdout.splitlines():
-            if line:
-                commits.add(line)
-    return commits
 
 
 def commits_to_prs(packages: List[Package]) -> None:
@@ -718,7 +721,7 @@ def load_packages(galaxy_root: Path, package_subset: List[str], last_commit: str
             continue
         package = read_package(package_path)
         packages.append(package)
-        package.commits = get_commits_since_last_version(package, last_commit)
+        package.commits = package.get_commits_since_last_version(last_commit)
     return packages
 
 
