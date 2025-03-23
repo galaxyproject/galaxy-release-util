@@ -749,7 +749,8 @@ def update_packages(
 
 def build_meta_dependencies(meta_package: Package, packages: List[Package], new_version: Version) -> None:
     """Update meta package dependencies."""
-    meta_deps = [f"galaxy-{p.name}=={new_version}" for p in packages if not p.name == "meta"]
+    # Skip tool shed, should not be required at runtime, and skip meta package itself
+    meta_deps = [f"galaxy-{p.name}=={new_version}" for p in packages if p.name not in ("meta", "tool_shed")]
     for line in meta_package.pinned_requirements_txt.read_text().splitlines():
         if not line.startswith(("--", "#")):
             meta_deps.append(line)
