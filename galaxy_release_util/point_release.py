@@ -461,14 +461,14 @@ def merge_and_resolve_branches(
     merge_cmd = ["git", "merge", base_branch]
     result = subprocess.run(merge_cmd, cwd=galaxy_root, capture_output=True, text=True)
     merge_conflict = result.returncode != 0  # merge conflict expected
-    # restore base galaxy version
+    # restore base galaxy versions
+    galaxy_versions = [
+        version_filepath(galaxy_root),
+        galaxy_root.joinpath("package.json"),
+        galaxy_root.joinpath("client", "package.json"),
+    ]
     subprocess.run(
-        [
-            "git",
-            "checkout",
-            new_branch,
-            str(version_filepath(galaxy_root)),
-        ],
+        ["git", "checkout", new_branch, *galaxy_versions],
         cwd=galaxy_root,
     )
     # we rewrite the packages changelog
