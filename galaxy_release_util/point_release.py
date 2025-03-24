@@ -1,4 +1,5 @@
 import datetime
+import json
 import re
 import subprocess
 from dataclasses import (
@@ -130,6 +131,54 @@ class Package:
         self.release_items.append(item)
 
     @property
+    def code_paths(self) -> List[Path]:
+        if self.name == "meta":
+            # every commit is relevant:
+            return [self.path / ".." / ".."]
+        package_code_paths = []
+        for code_dir in ["galaxy", "tests", "galaxy_test"]:
+            package_code_path = self.path / code_dir
+            if package_code_path.exists():
+                # get all symlinks pointing to a directory
+                for item in package_code_path.iterdir():
+                    # Check if the item is a symlink and if its target points to a directory
+                    if item.is_symlink() and item.resolve().is_dir():
+                        package_code_paths.append(item.resolve())
+        return package_code_paths
+
+    def get_commits_since_last_version(self, last_version_tag: str) -> Set[str]:
+        click.echo(f"finding commits to package {self.name} made since {last_version_tag}")
+        commits = set()
+        for package_source_path in self.code_paths:
+            result = subprocess.run(
+                [
+                    "git",
+                    "log",
+                    "--oneline",
+                    "--no-merges",
+                    "--pretty=format:%h",
+                    f"{last_version_tag}..HEAD",
+                    package_source_path,
+                ],
+                cwd=self.path,
+                capture_output=True,
+                text=True,
+            )
+            try:
+                result.check_returncode()
+            except subprocess.CalledProcessError as err:
+                if "unknown revision" in result.stderr:
+                    raise Exception(
+                        f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier"
+                    ) from err
+                raise err
+
+            for line in result.stdout.splitlines():
+                if line:
+                    commits.add(line)
+        return commits
+
+    @property
     def is_new(self) -> bool:
         """Package has not been released:
         - has only one release item,
@@ -242,48 +291,6 @@ def bump_package_version(package: Package, new_version: Version) -> None:
     new_content = [f"version = {new_version}" if line.startswith("version = ") else line for line in content]
     package.setup_cfg.write_text("\n".join(new_content) + "\n")
     package.modified_paths.append(package.setup_cfg)
-
-
-def get_commits_since_last_version(package: Package, last_version_tag: str) -> Set[str]:
-    click.echo(f"finding commits to package {package.name} made since {last_version_tag}")
-    package_source_paths = []
-    commits = set()
-    for code_dir in ["galaxy", "tests", "galaxy_test"]:
-        package_code_path = package.path / code_dir
-        if package_code_path.exists():
-            # get all symlinks pointing to a directory
-            for item in package_code_path.iterdir():
-                # Check if the item is a symlink and if its target points to a directory
-                if item.is_symlink() and item.resolve().is_dir():
-                    package_source_paths.append(item.resolve())
-    for package_source_path in package_source_paths:
-        result = subprocess.run(
-            [
-                "git",
-                "log",
-                "--oneline",
-                "--no-merges",
-                "--pretty=format:%h",
-                f"{last_version_tag}..HEAD",
-                package_source_path,
-            ],
-            cwd=package.path,
-            capture_output=True,
-            text=True,
-        )
-        try:
-            result.check_returncode()
-        except subprocess.CalledProcessError as err:
-            if "unknown revision" in result.stderr:
-                raise Exception(
-                    f"last version tag `{last_version_tag}` was not recognized by git as a valid revision identifier"
-                ) from err
-            raise err
-
-        for line in result.stdout.splitlines():
-            if line:
-                commits.add(line)
-    return commits
 
 
 def commits_to_prs(packages: List[Package]) -> None:
@@ -444,7 +451,7 @@ def merge_and_resolve_branches(
     subprocess.run(checkout_cmd, cwd=galaxy_root).check_returncode()
 
     package_paths = {p.path: p for p in packages}
-    packages_to_rewrite: List[Package] = []
+    packages_to_rewrite: List[Package] = [p for p in packages if p.name == "meta"]
     for package_path in get_sorted_package_paths(galaxy_root):
         if package_path not in package_paths:
             continue
@@ -454,14 +461,14 @@ def merge_and_resolve_branches(
     merge_cmd = ["git", "merge", base_branch]
     result = subprocess.run(merge_cmd, cwd=galaxy_root, capture_output=True, text=True)
     merge_conflict = result.returncode != 0  # merge conflict expected
-    # restore base galaxy version
+    # restore base galaxy versions
+    galaxy_versions = [
+        version_filepath(galaxy_root),
+        galaxy_root.joinpath("package.json"),
+        galaxy_root.joinpath("client", "package.json"),
+    ]
     subprocess.run(
-        [
-            "git",
-            "checkout",
-            new_branch,
-            str(version_filepath(galaxy_root)),
-        ],
+        ["git", "checkout", new_branch, *galaxy_versions],
         cwd=galaxy_root,
     )
     # we rewrite the packages changelog
@@ -656,6 +663,7 @@ def create_point_release(
     packages = load_packages(galaxy_root, package_subset, last_commit)
     commits_to_prs(packages)
     update_packages(packages, new_version, modified_paths)
+    update_client_version(galaxy_root, new_version, modified_paths)
     run_build_packages(build_packages, packages)
     show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
     run_upload_packages(build_packages, upload_packages, no_confirm, packages)
@@ -668,11 +676,27 @@ def create_point_release(
     set_root_version(version_py, dev_version)
     modified_paths = [version_py]
     update_packages(packages, dev_version, modified_paths, is_dev_version=True)
+    update_client_version(galaxy_root, dev_version, modified_paths)
     commit_message = f"Start work on {dev_version}"
     stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
 
     merge_changes_into_newer_branches(galaxy_root, packages, newer_branches, base_branch, no_confirm)
     push_references(galaxy_root, release_tag, all_branches, upstream, no_confirm)
+
+
+def update_client_version(galaxy_root: Path, new_version: Version, modified_paths: List[Path]) -> None:
+    package_json = galaxy_root.joinpath("client", "package.json")
+    modified_paths.append(package_json)
+    package_json_dict = json.loads(package_json.read_text())
+    package_json_dict["version"] = str(new_version)
+    package_json.write_text(f"{json.dumps(package_json_dict, indent=2)}\n")
+    if not new_version.is_devrelease:
+        # Only update root package.json if not a dev release, since those are not uploaded to npm
+        root_package_json = galaxy_root.joinpath("package.json")
+        modified_paths.append(root_package_json)
+        root_package_json_dict = json.loads(root_package_json.read_text())
+        root_package_json_dict["version"] = str(new_version)
+        root_package_json.write_text(f"{json.dumps(root_package_json_dict, indent=2)}\n")
 
 
 def check_galaxy_repo_is_clean(galaxy_root: Path) -> None:
@@ -700,7 +724,7 @@ def load_packages(galaxy_root: Path, package_subset: List[str], last_commit: str
             continue
         package = read_package(package_path)
         packages.append(package)
-        package.commits = get_commits_since_last_version(package, last_commit)
+        package.commits = package.get_commits_since_last_version(last_commit)
     return packages
 
 
@@ -725,7 +749,8 @@ def update_packages(
 
 def build_meta_dependencies(meta_package: Package, packages: List[Package], new_version: Version) -> None:
     """Update meta package dependencies."""
-    meta_deps = [f"galaxy-{p.name}=={new_version}" for p in packages if not p.name == "meta"]
+    # Skip tool shed, should not be required at runtime, and skip meta package itself
+    meta_deps = [f"galaxy-{p.name}=={new_version}" for p in packages if p.name not in ("meta", "tool_shed")]
     for line in meta_package.pinned_requirements_txt.read_text().splitlines():
         if not line.startswith(("--", "#")):
             meta_deps.append(line)
