@@ -240,7 +240,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Freeze Release (on or around ${freeze_date})**
 
     - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
-    - [ ] Ensure all [blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}) have been merged, closed, or postponed until the next release.
+    - [ ] Ensure all [freeze blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A"kind%2Fbug"+-is%3Adraft) have been merged, closed, or postponed until the next release. The following command will check release blocking PRs (not freeze blocking which filters out PRs with the "kind/bug" label and draft PRs):
 
           galaxy-release-util check-blocking-prs ${version} --release-date ${release_date}
 
