@@ -237,7 +237,7 @@ PRS_TEMPLATE = """
 RELEASE_ISSUE_TEMPLATE = string.Template(
     """
 
-- [ ] **Branch Release (on or around ${freeze_date})**
+- [ ] **Freeze Release (on or around ${freeze_date})**
 
     - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
     - [ ] Ensure all [blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}) have been merged, closed, or postponed until the next release.
