@@ -755,7 +755,9 @@ def build_meta_dependencies(meta_package: Package, packages: List[Package], new_
         if not line.startswith(("--", "#")):
             meta_deps.append(line)
     meta_deps.sort()
-    meta_package.path.joinpath("requirements.txt").write_text("\n".join(meta_deps))
+    requirements_txt = meta_package.path.joinpath("requirements.txt")
+    requirements_txt.write_text("\n".join(meta_deps))
+    meta_package.modified_paths.append(requirements_txt)
 
 
 def show_modified_paths_and_diff(galaxy_root: Path, modified_paths: List[Path], no_confirm: bool) -> None:
