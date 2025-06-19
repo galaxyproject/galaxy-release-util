@@ -199,9 +199,14 @@ class Package:
 def get_sorted_package_paths(galaxy_root: Path) -> List[Path]:
     root_package_path = galaxy_root.joinpath("packages")
     sorted_packages = root_package_path.joinpath("packages_by_dep_dag.txt").read_text().splitlines()
+    web_client_package_path = root_package_path.joinpath("web_client")
     meta_package_path = root_package_path.joinpath("meta")
     # Ignore empty lines and lines beginning with "#"
-    return [*(root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")), meta_package_path]
+    return [
+        *(root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")),
+        web_client_package_path,
+        meta_package_path,
+    ]
 
 
 def read_package(package_path: Path) -> Package:
