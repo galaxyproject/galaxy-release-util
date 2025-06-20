@@ -5,10 +5,28 @@ History
 
 
 ------------------
+0.3.0 (06-20-2025)
+------------------
+* Fix link to release docs by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/21
+* Remove outdated step from release issue template by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/22
+* Add tool+wf tests step to issue template, swap release notes step w/deployment on main by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/24
+* Misc. refactoring and enhancements to create_point_release by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/25
+* Update release notes templates by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/26
+* Mics fixes by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/27
+* Remove create-release step from issue template by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/28
+* Don't remove newline at the end of ``setup.cfg`` files by @nsoranzo in https://github.com/galaxyproject/galaxy-release-util/pull/29
+* Remove TS items from release publication issue template by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/30
+* Build and upload meta package, merge dependencies into requirements.txt by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/31
+* Bump and build client version by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/32
+* Commit metapackage requirements.txt by @natefoo in https://github.com/galaxyproject/galaxy-release-util/pull/34
+* Add web_client to packages to build by @natefoo in https://github.com/galaxyproject/galaxy-release-util/pull/35
+* Remove web_client and meta from package list since they were added to the package dag file by @natefoo in https://github.com/galaxyproject/galaxy-release-util/pull/36
+
+------------------
 0.2.0 (12-02-2024)
 ------------------
-Misc. refactoring and enhancements to bootstrap_history by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/19
-Fix strip_release bug by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/20
+* Misc. refactoring and enhancements to bootstrap_history by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/19
+* Fix strip_release bug by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/20
 
 -------------------
 0.1.11 (20-05-2024)
