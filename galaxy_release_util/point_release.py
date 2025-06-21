@@ -597,6 +597,23 @@ packages_option = click.option(
 no_confirm_option = click.option("--no-confirm", type=bool, is_flag=True, default=False)
 
 
+@group_options(galaxy_root_option, packages_option)
+@cli.command("build", help="Build packages without uploading")
+def build(
+    galaxy_root: Path,
+    package_subset: List[str],
+):
+    packages: List[Package] = []
+    for package_path in get_sorted_package_paths(galaxy_root):
+        if package_subset and package_path.name not in package_subset:
+            continue
+        package = read_package(package_path)
+        packages.append(package)
+    for package in packages:
+        click.echo(f"Building package {package}")
+        build_package(package)
+
+
 @group_options(galaxy_root_option, packages_option, no_confirm_option)
 @cli.command("build-and-upload", help="Build and upload packages")
 def build_and_upload(
