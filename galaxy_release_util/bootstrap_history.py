@@ -240,9 +240,11 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Freeze Release (on or around ${freeze_date})**
 
     - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
-    - [ ] Ensure all [freeze blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A"kind%2Fbug"+-is%3Adraft) have been merged, closed, or postponed until the next release. The following command will check release blocking PRs (not freeze blocking which filters out PRs with the "kind/bug" label and draft PRs):
+    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release.
+    - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests.
+    - [ ] Ensure all [freeze blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A"kind%2Fbug"+-is%3Adraft) have been merged, closed, or postponed until the next release.
 
-          galaxy-release-util check-blocking-prs ${version} --release-date ${release_date}
+- [ ] **Branch Release (on or around ${freeze_date} + 1 week)** (this is estimated to be a week after the freeze date; subject to change)
 
     - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``galaxy/model/migrations/dbscript.py``.
 
@@ -256,12 +258,10 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
           make release-create-rc
 
     - [ ] Open pull requests from your fork of branch ``version-${version}`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
-    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release.
-    - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests.
 
 - [ ] **Issue Review Timeline Notes**
 
-    - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 1 week, to allow time for notification prior to release.
+    - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 2 weeks, to allow time for notification prior to release.
     - [ ] Ensure ownership of outstanding bugfixes and track progress during freeze.
 
 - [ ] **Deploy and Test Release on galaxy-test**
@@ -282,6 +282,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
               For each failed test:
               - Does it occur under ${version} but not under ${previous_version}? If so:
                 - Check if there's an issue open. If not, open a new issue.
+        - [ ] Add/Update tests against IUC.
+            e.g.: https://github.com/galaxyproject/tools-iuc/pull/6995
 
     - [ ] IWC:
         - [ ] Open an issue "Test release ${version}" on the iwc repo: https://github.com/galaxyproject/iwc/
@@ -291,6 +293,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
               For each failed test:
               - Does it occur under ${version} but not under ${previous_version}? If so:
                 - Check if there's an issue open. If not, open a new issue.
+        - [ ] Add/Update tests against IWC.
+          e.g.: https://github.com/galaxyproject/iwc/pull/867
 
 - [ ] **Create Release Notes**
 
@@ -336,15 +340,18 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Open PR against planemo with a pin to the new packages
 
+    - [ ] Ensure the latest release is merged into the `master` branch: https://github.com/galaxyproject/galaxy/compare/master...release_${version}
+
 - [ ] **Announce Release**
 
     - [ ] Verify release included in https://docs.galaxyproject.org/en/master/releases/index.html.
     - [ ] Review announcement in https://github.com/galaxyproject/galaxy/blob/dev/doc/source/releases/${version}_announce.rst.
-    - [ ] Announce release on [Galaxy Hub](https://galaxyproject.org/) as a news content item. [An example](https://galaxyproject.org/news/2024-02-07-galaxy-release-23-2/).
+    - [ ] Announce release on [Galaxy Hub](https://galaxyproject.org/) not as a full news content item, but rather as a `external_url` link to the user facing release notes.
     - [ ] Post announcement to [Galaxy Help](https://help.galaxyproject.org/). [An example](https://help.galaxyproject.org/t/release-of-galaxy-23-2/11675).
     - [ ] Announce release on Galaxy's social media accounts ([Bluesky](https://bsky.app/profile/galaxyproject.bsky.social), [Mastodon](https://mstdn.science/@galaxyproject), [LinkedIn](https://linkedin.com/company/galaxy-project)).
     - [ ] Email announcement to [galaxy-dev](http://dev.list.galaxyproject.org/) and [galaxy-announce](http://announce.list.galaxyproject.org/) @lists.galaxyproject.org. [An example](https://lists.galaxyproject.org/archives/list/galaxy-announce@lists.galaxyproject.org/thread/ISB7ZNBDY3LQMC2KALGPVQ3DEJTH657Q/).
     - [ ] Adjust http://getgalaxy.org text and links to match current master branch by opening a PR at https://github.com/galaxyproject/galaxy-hub/
+    - [ ] Add gxy.io link to notes (e.g.: https://github.com/galaxyproject/gxy.io/pull/76)
 
 - [ ] **Complete release**
 
