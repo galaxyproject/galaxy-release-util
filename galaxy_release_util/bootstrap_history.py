@@ -340,7 +340,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Open PR against planemo with a pin to the new packages
 
-    - [ ] Ensure the latest release is merged into the `master` branch: https://github.com/galaxyproject/galaxy/compare/master...release_${version}
+    - [ ] Ensure the latest release is merged into the `master` branch, not via the Github UI but rather via the `--ff-only` merge command. The branches can be compared here: https://github.com/galaxyproject/galaxy/compare/master...release_${version}
 
 - [ ] **Announce Release**
 
