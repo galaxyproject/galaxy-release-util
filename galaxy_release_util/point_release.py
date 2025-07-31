@@ -631,7 +631,7 @@ def build_and_upload(
     package_subset: List[str],
     no_confirm: bool,
 ):
-    packages: List[Package] = _build(galaxy_root, package_subset)
+    packages = _build(galaxy_root, package_subset)
     if no_confirm or click.confirm("Upload packages ?"):
         for package in packages:
             click.echo(f"Uploading package {package}")
