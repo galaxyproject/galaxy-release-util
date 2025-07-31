@@ -618,6 +618,8 @@ def _build(
         packages.append(package)
     for package in packages:
         click.echo(f"Building package {package}")
+        if package.name == "meta":
+            build_meta_dependencies(package, packages, get_root_version(galaxy_root))
         build_package(package)
     return packages
 
@@ -632,8 +634,6 @@ def build_and_upload(
     packages: List[Package] = _build(galaxy_root, package_subset)
     if no_confirm or click.confirm("Upload packages ?"):
         for package in packages:
-            if package.name == "meta":
-                build_meta_dependencies(package, packages, get_root_version(galaxy_root))
             click.echo(f"Uploading package {package}")
             upload_package(package)
 
