@@ -5,7 +5,12 @@ History
 
 
 ------------------
-0.3.0 (06-20-2025)
+0.3.1 (01-08-2025)
+------------------
+* Rebuild meta dependencies by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/38
+
+------------------
+0.3.0 (20-06-2025)
 ------------------
 * Fix link to release docs by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/21
 * Remove outdated step from release issue template by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/22
@@ -23,7 +28,7 @@ History
 * Remove web_client and meta from package list since they were added to the package dag file by @natefoo in https://github.com/galaxyproject/galaxy-release-util/pull/36
 
 ------------------
-0.2.0 (12-02-2024)
+0.2.0 (02-12-2024)
 ------------------
 * Misc. refactoring and enhancements to bootstrap_history by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/19
 * Fix strip_release bug by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/20
