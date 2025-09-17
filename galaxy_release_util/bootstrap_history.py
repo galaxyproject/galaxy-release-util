@@ -157,7 +157,7 @@ Builtin Tool Updates
 .. tools
 
 Please see the full `release notes <https://github.com/galaxyproject/galaxy/releases/tag/v${release}.0>`__ for more details.
-The admin-facing release notes are available :doc:`${release} here <${release}_announce>`.
+The admin-facing release notes are available :doc:`here <${release}_announce>`.
 
 .. include:: ${release}_prs.rst
 
