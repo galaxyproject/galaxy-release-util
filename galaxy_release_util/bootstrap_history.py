@@ -30,7 +30,6 @@ from .metadata import (
     _pr_to_labels,
     _pr_to_str,
     _text_target,
-    GROUPED_TAGS,
     PROJECT_NAME,
     PROJECT_OWNER,
     PROJECT_URL,
@@ -40,42 +39,6 @@ from .util import verify_galaxy_root
 
 OLDER_RELEASES_FILENAME = "older_releases.rst"
 
-
-TEMPLATE = """
-.. to_doc
-
-${release}
-===============================
-
-.. announce_start
-
-Enhancements
--------------------------------
-
-.. major_feature
-
-
-.. feature
-
-.. enhancement
-
-.. small_enhancement
-
-
-
-Fixes
--------------------------------
-
-.. major_bug
-
-
-.. bug
-
-
-.. include:: ${release}_prs.rst
-
-"""
-
 ANNOUNCE_TEMPLATE = string.Template(
     """
 ===========================================================
@@ -84,25 +47,8 @@ ${release} Galaxy Release (${month_name} ${year})
 
 .. include:: _header.rst
 
-Highlights
-===========================================================
-
-Feature1
---------
-
-Feature description.
-
-Feature2
---------
-
-Feature description.
-
-Feature3
---------
-
-Feature description.
-
 Please see the `${release} user release notes <${release}_announce_user.html>`__ for a summary of new user features.
+The `GitHub Release Notes <https://github.com/galaxyproject/galaxy/releases/tag/v${release}.0>`__ provide a comprehensive overview of all changes.
 
 Get Galaxy
 ===========================================================
@@ -128,7 +74,9 @@ Add content or drop section.
 
 Configuration Changes
 ===========================================================
-Add content or drop section.
+Run ``python scripts/release-diff.py release_<previous_version>`` in the Galaxy root directory
+to get a diff of configuration changes between releases.
+Add any more content or drop section if it's empty.
 
 Deprecation Notices
 ===========================================================
@@ -137,12 +85,6 @@ Add content or drop section.
 Developer Notes
 ===========================================================
 Add content or drop section.
-
-Release Notes
-===========================================================
-
-.. include:: ${release}.rst
-   :start-after: announce_start
 
 Release Team
 ===========================================================
@@ -174,33 +116,37 @@ ${release} Galaxy Release (${month_name} ${year})
 
 .. include:: _header.rst
 
-Please see the full :doc:`${release} release notes <${release}_announce>` for more details.
+Please see the full `release notes <https://github.com/galaxyproject/galaxy/releases/tag/v${release}.0>`__ for more details.
 
 Highlights
 ===========================================================
 
+Discover some of the exciting new features, enhancements, and improvements in Galaxy ${release}.
+
 Feature1
 --------
 
-Feature description.
+A description of the feature and its main highlights. Include screenshots/videos if applicable.
 
 Feature2
 --------
 
-Feature description.
+A description of the feature and its main highlights. Include screenshots/videos if applicable.
 
 Feature3
 --------
 
-Feature description.
+A description of the feature and its main highlights. Include screenshots/videos if applicable.
 
 
-Visualizations
+----
+
+Visualizations Updates
 ===========================================================
 
 .. visualizations
 
-Datatypes
+Datatypes Updates
 ===========================================================
 
 .. datatypes
@@ -210,7 +156,8 @@ Builtin Tool Updates
 
 .. tools
 
-Please see the full :doc:`${release} release notes <${release}_announce>` for more details.
+Please see the full `release notes <https://github.com/galaxyproject/galaxy/releases/tag/v${release}.0>`__ for more details.
+The admin-facing release notes are available :doc:`here <${release}_announce>`.
 
 .. include:: ${release}_prs.rst
 
@@ -447,16 +394,6 @@ def create_release_issue(
 @group_options(release_version_argument, next_version_option, galaxy_root_option, release_date_option)
 def create_changelog(release_version: Version, next_version: Version, galaxy_root: Path, release_date: datetime.date):
 
-    def create_release_file() -> None:
-        enhancement_targets = "\n\n".join(f".. enhancement_tag_{value}" for value in GROUPED_TAGS.values())
-        bug_targets = "\n\n".join(f".. bug_tag_{value}" for value in GROUPED_TAGS.values())
-
-        content = string.Template(TEMPLATE).substitute(release=release_version)
-        content = content.replace(".. enhancement", f"{enhancement_targets}\n\n.. enhancement")
-        content = content.replace(".. bug", f"{bug_targets}\n\n.. bug")
-        filename = _release_file(galaxy_root, f"{release_version}.rst")
-        _write_file(filename, content, skip_if_exists=True)
-
     def create_announcement_file() -> None:
         month = calendar.month_name[release_date.month]
         year = release_date.year
@@ -481,7 +418,7 @@ def create_changelog(release_version: Version, next_version: Version, galaxy_roo
 
     verify_galaxy_root(galaxy_root)
     next_version = next_version or _get_next_release_version(release_version)
-    create_release_file()
+
     create_announcement_file()
     create_user_announcement_file()
     create_prs_file()
@@ -616,9 +553,6 @@ def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> 
         return wrap(to_doc)
 
     to_doc = make_pr_to_doc()
-
-    filename = _release_file(galaxy_root, f"{release_version}.rst")
-    extend_release_file_content(filename)
 
     filename = _release_file(galaxy_root, f"{release_version}_announce_user.rst")
     extend_user_announce_file_content(filename)
