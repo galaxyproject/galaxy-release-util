@@ -191,7 +191,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests.
     - [ ] Ensure all [freeze blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A"kind%2Fbug"+-is%3Adraft) have been merged, closed, or postponed until the next release.
 
-- [ ] **Branch Release (on or around ${freeze_date} + 1 week)** (this is estimated to be a week after the freeze date; subject to change)
+- [ ] **Branch Release**
 
     - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``galaxy/model/migrations/dbscript.py``.
 
