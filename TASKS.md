@@ -74,7 +74,7 @@ We ensure that all previous release publication issues are closed before publish
  
 3. Select and close previous publication issues
 
-### Step 6: Open Release Publication Issue
+### Step 6: Open New Release Publication Issue
 Using `galaxy-release-util`, we are now ready to publish the release issue on `GitHub`, which will publicly track the release publication stages using a checklist of items.
 
 1. Make sure that you are in your `galaxy-release-util` virtual environment.
