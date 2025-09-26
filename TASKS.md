@@ -4,9 +4,9 @@ This document provides a step-by-step guide for managing Galaxy releases. It out
 
 ## Tasks
 
-### Step 1: Determine Freeze Date
+### Step 1: Determine Freeze and Release Date
 
-Discuss and agree on an appropriate freeze date (DATE_OF_FREEZE_MEETING) with the team during a dev meeting.
+Discuss and agree on an appropriate freeze date (DATE_OF_FREEZE) and anticipated release date (RELEASE_DATE) with the team during a dev meeting.
 
 ### Step 2: Announce Freeze Meeting
 
@@ -64,3 +64,29 @@ Use the `which` command to confirm that the version of `galaxy-release-util` bei
 ```bash
 which galaxy-release-util
 ```
+
+### Step 5: Close Previous Release Publication Issues
+We ensure that all previous release publication issues are closed before publishing a new one.
+
+1. Go to: [https://github.com/galaxyproject/galaxy/issues](https://github.com/galaxyproject/galaxy/issues)
+   
+2. Search for: `Publication of Galaxy Release`
+ 
+3. Select and close previous publication issues
+
+### Step 6: Open Release Publication Issue
+Using `galaxy-release-util`, we are now ready to publish the release issue on `GitHub`, which will publicly track the release publication stages using a checklist of items.
+
+1. Make sure that you are in your `galaxy-release-util` virtual environment.
+
+2. Enter your Galaxy root directory:
+```bash
+cd <GALAXY_ROOT>
+```
+
+3. Review the release issue output in the terminal (`--dry-run`):
+```bash
+galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run y --release-date 'YEAR-MONTH-DAY'
+```
+
+4. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
