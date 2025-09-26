@@ -84,9 +84,14 @@ Using `galaxy-release-util`, we are now ready to publish the release issue on `G
 cd <GALAXY_ROOT>
 ```
 
-3. Review the release issue output in the terminal (`--dry-run`):
-```bash
-galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run y --release-date 'YEAR-MONTH-DAY'
-```
+3. Review the release issue output in the terminal (`--dry-run`): `galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run y --release-date 'YEAR-MONTH-DAY'`
 
-4. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
+5. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
+
+### Step 7: Are we good to freeze?
+
+Use the following filter to identify PRs without `kind/*` labels and assign the appropriate `kind/*` labels. This helps compile the final list of PRs for the current milestone that must be included in the release by the freeze date.
+
+1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)  
+2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies`
+3. Assign proper labels, and milestones to these PRs
