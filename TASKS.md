@@ -14,11 +14,9 @@ Two weeks before the actual freeze, we announce the freeze meeting for the upcom
 
 1. Send the following message:
 
-```
-🗓️ Freeze Meeting on <DATE_OF_FREEZE_MEETING>
-
-Hello everyone, we will meet on <DATE_OF_FREEZE_MEETING> for the Freeze Meeting, one week before the actual freeze. We will review open PRs, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges are completed by the freeze date. If you have outstanding PRs, please make sure they are set to ready-for-review before the meeting.
-```
+>🗓️ Freeze Meeting on <DATE_OF_FREEZE_MEETING>
+>
+>We will meet on <DATE_OF_FREEZE_MEETING> for the Freeze Meeting, one week before the actual freeze. We will review open PRs, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges are completed by the freeze date. If you have outstanding PRs, please make sure they are set to ready-for-review before the meeting.
 
 2. To these channels:
 
