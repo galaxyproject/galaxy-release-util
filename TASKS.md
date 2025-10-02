@@ -95,3 +95,25 @@ Use the following filter to identify PRs without `kind/*` labels and assign the 
 1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)  
 2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies`
 3. Assign proper labels, and milestones to these PRs
+
+### Step 8: Review of Blockers
+
+Write the following message to above channels:
+
+> 📌 We're Frozen!
+> Hey everyone!
+> As planned, as of today we're officially frozen for <RELEASE_TAG> - no new features or enhancements against the <RELEASE_TAG> milestone after this point.
+> We still have <NUMBER_OF_OPEN_PRS> PRs from the freeze list that need to be merged before we can branch. It would be great if folks can review these remaining ones as soon as possible, so we can actually branch. Even if a PR is assigned to someone else, feel free to jump in with a review!
+> Link to the remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A<RELEASE_TAG>
+
+### Step 9: Review Merged PRs
+
+1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)
+
+2. Identify all PRs merged since the last release that are missing the appropriate tag and assign the correct tag.
+
+Search for: `is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PREVIOUS-RELEASE> -milestone:<RELEASE_TAG>`
+
+3. Review all PRs for the new release and update their titles as needed according to the Galaxy contributing guidelines, particularly point 6: https://github.com/galaxyproject/galaxy/blob/dev/CONTRIBUTING.md#how-to-contribute.
+
+Search for: `is:pr milestone:<RELEASE_TAG>`
