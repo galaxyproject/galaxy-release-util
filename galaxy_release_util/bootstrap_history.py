@@ -206,19 +206,6 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Open pull requests from your fork of branch ``version-${version}`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
 
-- [ ] **Issue Review Timeline Notes**
-
-    - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 2 weeks, to allow time for notification prior to release.
-    - [ ] Ensure ownership of outstanding bugfixes and track progress during freeze.
-
-- [ ] **Deploy and Test Release on galaxy-test**
-
-    - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
-    - [ ] Request that testtoolshed.g2.bx.psu.edu is updated to ``${version}``.
-    - [ ] Conduct formal release testing on test.galaxyproject.org (see ${version} release testing plan).
-    - [ ] Ensure all critical bugs detected during release testing have been fixed.
-
-
 - [ ] **Run tool and workflow tests:**
 
     - [ ] IUC:
@@ -242,6 +229,18 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
                 - Check if there's an issue open. If not, open a new issue.
         - [ ] Add/Update tests against IWC.
           e.g.: https://github.com/galaxyproject/iwc/pull/867
+
+- [ ] **Issue Review Timeline Notes**
+
+    - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 2 weeks, to allow time for notification prior to release.
+    - [ ] Ensure ownership of outstanding bugfixes and track progress during freeze.
+
+- [ ] **Deploy and Test Release on galaxy-test**
+
+    - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
+    - [ ] Request that testtoolshed.g2.bx.psu.edu is updated to ``${version}``.
+    - [ ] Conduct formal release testing on test.galaxyproject.org (see ${version} release testing plan).
+    - [ ] Ensure all critical bugs detected during release testing have been fixed.
 
 - [ ] **Create Release Notes**
 
