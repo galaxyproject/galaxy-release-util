@@ -88,7 +88,18 @@ cd <GALAXY_ROOT>
 
 5. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
 
-### Step 7: Are we good to freeze?
+### Step 7: Create Milestone for Future Release
+Using the GitHub interface, create a new milestone.
+
+1. Go to [https://github.com/galaxyproject/galaxy/milestones](https://github.com/galaxyproject/galaxy/milestones)
+2. Click **New milestone** and create a new milestone
+3. Note the milestone number from the URL:  
+   `https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>`
+4. Edit [`.github/workflows/maintenance_bot.yaml`](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
+5. Open a pull request to update the milestone.  
+   Example: [https://github.com/galaxyproject/galaxy/pull/20946](https://github.com/galaxyproject/galaxy/pull/20946)
+
+### Step 8: Are we good to freeze?
 
 Use the following filter to identify PRs without `kind/*` labels and assign the appropriate `kind/*` labels. This helps compile the final list of PRs for the current milestone that must be included in the release by the freeze date.
 
@@ -96,7 +107,7 @@ Use the following filter to identify PRs without `kind/*` labels and assign the 
 2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies`
 3. Assign proper labels, and milestones to these PRs
 
-### Step 8: Review of Blockers
+### Step 9: Review of Blockers
 
 Write the following message to above channels:
 
@@ -106,7 +117,7 @@ Write the following message to above channels:
 > We still have <NUMBER_OF_OPEN_PRS> PRs from the freeze list that need to be merged before we can branch. It would be great if folks can review these remaining ones as soon as possible, so we can actually branch. Even if a PR is assigned to someone else, feel free to jump in with a review!
 > Link to the remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A<RELEASE_TAG>
 
-### Step 9: Review Merged PRs
+### Step 10: Review Merged PRs
 
 1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)
 
