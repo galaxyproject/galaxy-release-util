@@ -101,11 +101,13 @@ Using the GitHub interface, create a new milestone.
 2. Click **New milestone** and create a new milestone
 
 3. Note the milestone number from the URL:  
-   `https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>`
+```
+https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>
+```
 
-4. Edit https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
+5. Edit https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
 
-5. Open a pull request to update the milestone.  
+6. Open a pull request to update the milestone.  
    Example: https://github.com/galaxyproject/galaxy/pull/20946
 
 ### Step 8: Are we good to freeze?
