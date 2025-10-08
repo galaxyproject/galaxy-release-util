@@ -84,7 +84,10 @@ Using `galaxy-release-util`, we are now ready to publish the release issue on `G
 cd <GALAXY_ROOT>
 ```
 
-3. Review the release issue output in the terminal (`--dry-run yes`): `galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --release-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run yes`
+3. Review the release issue output in the terminal (`--dry-run yes`):
+```
+galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --release-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run yes
+```
 
 4. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
 
