@@ -30,8 +30,10 @@ One week before the freeze, we hold the Freeze Meeting, usually during a weekly 
 
 To list all PRs for discussion:
 
-1. Go to: https://github.com/galaxyproject/galaxy/pulls
-2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:kind/bug -is:draft`
+1. Go to: https://github.com/galaxyproject/galaxy/pulls, search for:
+```
+is:open is:pr milestone:<RELEASE_TAG> -label:kind/bug -is:draft
+```
 
 ### Step 4: Install Galaxy Release Utility
 Much of the release process has been automated with `galaxy-release-util`. In the following section, we show how to install it and ensure that your installed version is up-to-date.
