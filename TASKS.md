@@ -30,7 +30,7 @@ One week before the freeze, we hold the Freeze Meeting, usually during a weekly 
 
 To list all PRs for discussion:
 
-1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)  
+1. Go to: https://github.com/galaxyproject/galaxy/pulls
 2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:kind/bug -is:draft`
 
 ### Step 4: Install Galaxy Release Utility
@@ -68,7 +68,7 @@ which galaxy-release-util
 ### Step 5: Close Previous Release Publication Issues
 We ensure that all previous release publication issues are closed before publishing a new one.
 
-1. Go to: [https://github.com/galaxyproject/galaxy/issues](https://github.com/galaxyproject/galaxy/issues)
+1. Go to: https://github.com/galaxyproject/galaxy/issues
    
 2. Search for: `Publication of Galaxy Release`
  
@@ -91,19 +91,19 @@ cd <GALAXY_ROOT>
 ### Step 7: Create Milestone for Future Release
 Using the GitHub interface, create a new milestone.
 
-1. Go to [https://github.com/galaxyproject/galaxy/milestones](https://github.com/galaxyproject/galaxy/milestones)
+1. Go to https://github.com/galaxyproject/galaxy/milestones
 2. Click **New milestone** and create a new milestone
 3. Note the milestone number from the URL:  
    `https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>`
-4. Edit [`.github/workflows/maintenance_bot.yaml`](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
+4. Edit https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
 5. Open a pull request to update the milestone.  
-   Example: [https://github.com/galaxyproject/galaxy/pull/20946](https://github.com/galaxyproject/galaxy/pull/20946)
+   Example: https://github.com/galaxyproject/galaxy/pull/20946
 
 ### Step 8: Are we good to freeze?
 
 Use the following filter to identify PRs without `kind/*` labels and assign the appropriate `kind/*` labels. This helps compile the final list of PRs for the current milestone that must be included in the release by the freeze date.
 
-1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)  
+1. Go to: https://github.com/galaxyproject/galaxy/pulls
 2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies`
 3. Assign proper labels, and milestones to these PRs
 
@@ -119,7 +119,7 @@ Write the following message to above channels:
 
 ### Step 10: Review Merged PRs
 
-1. Go to: [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls)
+1. Go to: https://github.com/galaxyproject/galaxy/pulls
 
 2. Identify all PRs merged since the last release that are missing the appropriate tag and assign the correct tag.
 
@@ -128,3 +128,56 @@ Search for: `is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PR
 3. Review all PRs for the new release and update their titles as needed according to the Galaxy contributing guidelines, particularly point 6: https://github.com/galaxyproject/galaxy/blob/dev/CONTRIBUTING.md#how-to-contribute.
 
 Search for: `is:pr milestone:<RELEASE_TAG>`
+
+### Step 11: Update Database Revision
+
+1. Switch to your `dev` branch and ensure it is up to date, for example by running:  
+   `git pull upstream dev`
+2. Run:  
+   `./manage_db.sh version`
+3. Note the first revision identifier `<DB_REVISION> (gxy) (head)`.
+4. Edit `lib/galaxy/model/migrations/dbrevisions.py` and add a new entry:  
+   `"<RELEASE_TAG>": "<DB_REVISION>",`
+5. Open a pull request to update the database revision.  
+   Example: https://github.com/galaxyproject/galaxy/pull/21017
+
+### Step 12: Merge Previous Release into `dev`
+
+1. Check out the previous release:  
+   `git checkout release_<PREVIOUS_RELEASE_TAG>`
+2. Ensure the previous release is up to date:  
+   `git pull upstream release_<PREVIOUS_RELEASE_TAG>`
+3. Check out `dev` and merge the previous release into it:  
+   `git checkout dev`  
+   `git merge release_<PREVIOUS_RELEASE_TAG>`  
+   `git commit -a -m "Merge <PREVIOUS_RELEASE_TAG> into dev"`  
+   `git push`
+4. Open a pull request against `dev` and merge it.
+
+### Step 13: Create Release Candidate Branches
+
+1. Check out the `dev` branch and pull the latest changes:  
+   `git checkout dev`  
+   `git pull upstream dev`
+
+2. Run the release creation command:  
+   `make release-create-rc`
+
+3. This command creates two branches:
+
+   **a. `version-<FUTURE_RELEASE_TAG>.dev`**  
+   Title: `Version <FUTURE_RELEASE_TAG>.dev`  
+   - Open a pull request **against `dev`**.  
+     Example: [https://github.com/galaxyproject/galaxy/pull/21020](https://github.com/galaxyproject/galaxy/pull/21020)  
+   - **Note:** Manually verify this step because it:  
+     1. may generate the wrong future release number  
+     2. adds a client-hash-build file that must be removed
+
+   **b. `version-<RELEASE_TAG>.rc1`**  
+   Title: `Update version to <RELEASE_TAG>.rc1`  
+   - Open a pull request **against `galaxyproject:release_<RELEASE_TAG>`**.  
+     Example: [https://github.com/galaxyproject/galaxy/pull/21019](https://github.com/galaxyproject/galaxy/pull/21019)
+
+
+   
+   
