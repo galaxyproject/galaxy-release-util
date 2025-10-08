@@ -86,16 +86,20 @@ cd <GALAXY_ROOT>
 
 3. Review the release issue output in the terminal (`--dry-run yes`): `galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --release-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run yes`
 
-5. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
+4. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
 
 ### Step 7: Create Milestone for Future Release
 Using the GitHub interface, create a new milestone.
 
 1. Go to https://github.com/galaxyproject/galaxy/milestones
+  
 2. Click **New milestone** and create a new milestone
+
 3. Note the milestone number from the URL:  
    `https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>`
+
 4. Edit https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
+
 5. Open a pull request to update the milestone.  
    Example: https://github.com/galaxyproject/galaxy/pull/20946
 
@@ -103,9 +107,12 @@ Using the GitHub interface, create a new milestone.
 
 Use the following filter to identify PRs without `kind/*` labels and assign the appropriate `kind/*` labels. This helps compile the final list of PRs for the current milestone that must be included in the release by the freeze date.
 
-1. Go to: https://github.com/galaxyproject/galaxy/pulls
-2. Search for: `is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies`
-3. Assign proper labels, and milestones to these PRs
+1. Go to: https://github.com/galaxyproject/galaxy/pulls and search for:
+```
+is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies
+```
+
+2. Assign proper labels, and milestones to these PRs
 
 ### Step 9: Review of Blockers
 
@@ -121,47 +128,72 @@ Write the following message to above channels:
 
 1. Go to: https://github.com/galaxyproject/galaxy/pulls
 
-2. Identify all PRs merged since the last release that are missing the appropriate tag and assign the correct tag.
+2. Identify all PRs merged since the last release that are missing the appropriate tag and assign the correct tag. Search for:
+```
+is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PREVIOUS-RELEASE> -milestone:<RELEASE_TAG>
+```
 
-Search for: `is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PREVIOUS-RELEASE> -milestone:<RELEASE_TAG>`
-
-3. Review all PRs for the new release and update their titles as needed according to the Galaxy contributing guidelines, particularly point 6: https://github.com/galaxyproject/galaxy/blob/dev/CONTRIBUTING.md#how-to-contribute.
-
-Search for: `is:pr milestone:<RELEASE_TAG>`
+4. Review all PRs for the new release and update their titles as needed according to the Galaxy contributing guidelines, particularly point 6: https://github.com/galaxyproject/galaxy/blob/dev/CONTRIBUTING.md#how-to-contribute. Search for:
+```
+is:pr milestone:<RELEASE_TAG>
+```
 
 ### Step 11: Update Database Revision
 
 1. Switch to your `dev` branch and ensure it is up to date, for example by running:  
-   `git pull upstream dev`
+```bash
+git pull upstream dev
+```
+
 2. Run:  
-   `./manage_db.sh version`
+```bash
+./manage_db.sh version
+```
+
 3. Note the first revision identifier `<DB_REVISION> (gxy) (head)`.
+
 4. Edit `lib/galaxy/model/migrations/dbrevisions.py` and add a new entry:  
-   `"<RELEASE_TAG>": "<DB_REVISION>",`
-5. Open a pull request to update the database revision.  
+```
+"<RELEASE_TAG>": "<DB_REVISION>",
+```
+
+6. Open a pull request to update the database revision.  
    Example: https://github.com/galaxyproject/galaxy/pull/21017
 
 ### Step 12: Merge Previous Release into `dev`
 
 1. Check out the previous release:  
-   `git checkout release_<PREVIOUS_RELEASE_TAG>`
+```bash
+git checkout release_<PREVIOUS_RELEASE_TAG>
+```
+
 2. Ensure the previous release is up to date:  
-   `git pull upstream release_<PREVIOUS_RELEASE_TAG>`
+```bash
+git pull upstream release_<PREVIOUS_RELEASE_TAG>
+```
+
 3. Check out `dev` and merge the previous release into it:  
-   `git checkout dev`  
-   `git merge release_<PREVIOUS_RELEASE_TAG>`  
-   `git commit -a -m "Merge <PREVIOUS_RELEASE_TAG> into dev"`  
-   `git push`
-4. Open a pull request against `dev` and merge it.
+```bash
+git checkout dev
+git merge release_<PREVIOUS_RELEASE_TAG>
+git commit -a -m "Merge <PREVIOUS_RELEASE_TAG> into dev"
+git push
+```
+
+6. Open a pull request against `dev` and merge it.
 
 ### Step 13: Create Release Candidate Branches
 
 1. Check out the `dev` branch and pull the latest changes:  
-   `git checkout dev`  
-   `git pull upstream dev`
+```bash
+git checkout dev
+git pull upstream dev
+```
 
 2. Run the release creation command:  
-   `make release-create-rc`
+```bash
+make release-create-rc
+```
 
 3. This command creates two branches:
 
