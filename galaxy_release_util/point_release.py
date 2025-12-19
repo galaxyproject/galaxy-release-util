@@ -714,6 +714,8 @@ def update_client_version(galaxy_root: Path, new_version: Version, modified_path
         modified_paths.append(root_package_json)
         root_package_json_dict = json.loads(root_package_json.read_text())
         root_package_json_dict["version"] = str(new_version)
+        # Also update the dependency version to match (use exact version, no semver range)
+        root_package_json_dict["dependencies"]["@galaxyproject/galaxy-client"] = str(new_version)
         root_package_json.write_text(f"{json.dumps(root_package_json_dict, indent=2)}\n")
 
 
