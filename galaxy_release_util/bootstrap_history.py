@@ -193,7 +193,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 - [ ] **Branch Release**
 
-    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``galaxy/model/migrations/dbscript.py``.
+    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``lib/galaxy/model/migrations/dbrevisions.py``.
 
     - [ ] Merge the latest release into dev and push upstream.
 
@@ -204,20 +204,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           make release-create-rc
 
-    - [ ] Open pull requests from your fork of branch ``version-${version}`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
-
-- [ ] **Issue Review Timeline Notes**
-
-    - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 2 weeks, to allow time for notification prior to release.
-    - [ ] Ensure ownership of outstanding bugfixes and track progress during freeze.
-
-- [ ] **Deploy and Test Release on galaxy-test**
-
-    - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
-    - [ ] Request that testtoolshed.g2.bx.psu.edu is updated to ``${version}``.
-    - [ ] Conduct formal release testing on test.galaxyproject.org (see ${version} release testing plan).
-    - [ ] Ensure all critical bugs detected during release testing have been fixed.
-
+    - [ ] Open pull requests from your fork of branch ``version-${version}.rc1`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
 
 - [ ] **Run tool and workflow tests:**
 
@@ -242,6 +229,18 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
                 - Check if there's an issue open. If not, open a new issue.
         - [ ] Add/Update tests against IWC.
           e.g.: https://github.com/galaxyproject/iwc/pull/867
+
+- [ ] **Issue Review Timeline Notes**
+
+    - [ ] Ensure any security fixes will be ready prior to ${freeze_date} + 2 weeks, to allow time for notification prior to release.
+    - [ ] Ensure ownership of outstanding bugfixes and track progress during freeze.
+
+- [ ] **Deploy and Test Release on galaxy-test**
+
+    - [ ] Update test.galaxyproject.org to ensure it is running the ``release_${version}`` branch.
+    - [ ] Request that testtoolshed.g2.bx.psu.edu is updated to ``${version}``.
+    - [ ] Conduct formal release testing on test.galaxyproject.org (see ${version} release testing plan).
+    - [ ] Ensure all critical bugs detected during release testing have been fixed.
 
 - [ ] **Create Release Notes**
 
@@ -283,7 +282,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
 
-          galaxy-release-util create-release --new-version ${version}.0 --last-commit [insert latest tag, e.g. v24.1.4]
+          galaxy-release-util create-release --new-version ${version}.0 --last-commit <LAST_RELEASE_TAG>
 
     - [ ] Open PR against planemo with a pin to the new packages
 
