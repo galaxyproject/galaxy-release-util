@@ -193,7 +193,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 - [ ] **Branch Release**
 
-    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``galaxy/model/migrations/dbscript.py``.
+    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``lib/galaxy/model/migrations/dbrevisions.py``.
 
     - [ ] Merge the latest release into dev and push upstream.
 
