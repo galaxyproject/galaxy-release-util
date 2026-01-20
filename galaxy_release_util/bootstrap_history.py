@@ -204,7 +204,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           make release-create-rc
 
-    - [ ] Open pull requests from your fork of branch ``version-${version}`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
+    - [ ] Open pull requests from your fork of branch ``version-${version}.rc1`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
 
 - [ ] **Run tool and workflow tests:**
 
