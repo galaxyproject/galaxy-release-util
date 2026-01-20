@@ -5,6 +5,16 @@ History
 
 
 ------------------
+0.3.2 (20-01-2026)
+------------------
+* Don't add ``requirements.txt`` to ``meta_package.modified_paths`` by @nsoranzo in https://github.com/galaxyproject/galaxy-release-util/pull/39
+* Changes to Release Issue Template by @ahmedhamidawan in https://github.com/galaxyproject/galaxy-release-util/pull/33
+* Restructure release notes to account for GitHub notes by @ahmedhamidawan in https://github.com/galaxyproject/galaxy-release-util/pull/40
+* Remove the "plus one week" timeframe separation between freezing and branching by @ahmedhamidawan in https://github.com/galaxyproject/galaxy-release-util/pull/41
+* Add Release Manager Task Instructions by @guerler in https://github.com/galaxyproject/galaxy-release-util/pull/42
+* Update galaxy-client dependency version during point releases by @dannon in https://github.com/galaxyproject/galaxy-release-util/pull/43
+
+------------------
 0.3.1 (01-08-2025)
 ------------------
 * Rebuild meta dependencies by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/38
