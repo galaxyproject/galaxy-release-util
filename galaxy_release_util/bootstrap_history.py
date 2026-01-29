@@ -20,21 +20,22 @@ from github.PullRequest import PullRequest
 from packaging.version import Version
 
 from .cli.options import (
-    ClickDate,
     ClickVersion,
     galaxy_root_option,
     group_options,
+    release_config_option,
 )
 from .github_client import github_client
 from .metadata import (
-    _pr_to_labels,
-    _pr_to_str,
-    _text_target,
     PROJECT_NAME,
     PROJECT_OWNER,
-    PROJECT_URL,
+    _pr_to_labels,
+    _pr_to_str,
+    get_project_url,
+    get_repo_name,
     strip_release,
 )
+from .release_config import load_release_config
 from .util import verify_galaxy_root
 
 OLDER_RELEASES_FILENAME = "older_releases.rst"
@@ -308,26 +309,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 release_version_argument = click.argument("release-version", type=ClickVersion())
 
-next_version_option = click.option(
-    "--next-version",
-    type=ClickVersion(),
-    help="Next release version",
-)
-
-freeze_date_option = click.option(
-    "--freeze-date",
-    type=ClickDate(),
-    required=True,
-)
-
-release_date_option = click.option(
-    "--release-date",
-    type=ClickDate(),
-    required=True,
-)
-
 dry_run_option = click.option(
-    "--dry-run", type=bool, default=False, help="Do not connect to GitHub's API, print out output"
+    "--dry-run", is_flag=True, default=False, help="Do not connect to GitHub's API, print out output"
 )
 
 log = logging.getLogger(__name__)
@@ -341,31 +324,26 @@ def cli():
 @cli.command(help="Create release checklist issue on GitHub")
 @group_options(
     release_version_argument,
-    next_version_option,
-    freeze_date_option,
     galaxy_root_option,
-    release_date_option,
+    release_config_option,
     dry_run_option,
 )
 def create_release_issue(
     release_version: Version,
-    next_version: Version,
-    freeze_date: datetime.date,
     galaxy_root: Path,
-    release_date: datetime.date,
+    release_config: Optional[Path],
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    previous_version = _get_previous_release_version(galaxy_root, release_version)
-    next_version = next_version or _get_next_release_version(release_version)
-    assert next_version > release_version, "Next release version should be greater than release version"
+    config = load_release_config(galaxy_root, release_version, release_config)
+    assert config.next_version > release_version, "Next release version should be greater than release version"
 
     issue_template_params = dict(
         version=release_version,
-        next_version=next_version,
-        previous_version=previous_version,
-        freeze_date=freeze_date,
-        release_date=release_date,
+        next_version=config.next_version,
+        previous_version=config.previous_version,
+        freeze_date=config.freeze_date,
+        release_date=config.release_date,
     )
     issue_contents = RELEASE_ISSUE_TEMPLATE.substitute(**issue_template_params)
     issue_title = f"Publication of Galaxy Release v {release_version}"
@@ -376,7 +354,7 @@ def create_release_issue(
         return None
     try:
         github = github_client()
-        repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
+        repo = github.get_repo(get_repo_name(config.owner, config.repo))
         release_issue = repo.create_issue(
             title=issue_title,
             body=issue_contents,
@@ -390,8 +368,12 @@ def create_release_issue(
 
 
 @cli.command(help="Create or update release changelog")
-@group_options(release_version_argument, next_version_option, galaxy_root_option, release_date_option)
-def create_changelog(release_version: Version, next_version: Version, galaxy_root: Path, release_date: datetime.date):
+@group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
+def create_changelog(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+    verify_galaxy_root(galaxy_root)
+    config = load_release_config(galaxy_root, release_version, release_config)
+    release_date = config.release_date
+    next_version = config.next_version
 
     def create_announcement_file() -> None:
         month = calendar.month_name[release_date.month]
@@ -415,32 +397,40 @@ def create_changelog(release_version: Version, next_version: Version, galaxy_roo
         filename = _release_file(galaxy_root, f"{next_version}_announce.rst")
         _write_file(filename, content, skip_if_exists=True)
 
-    verify_galaxy_root(galaxy_root)
-    next_version = next_version or _get_next_release_version(release_version)
-
     create_announcement_file()
     create_user_announcement_file()
     create_prs_file()
     create_next_release_announcement_file()
-    _load_prs(galaxy_root, release_version, release_date)
+    if dry_run:
+        click.echo("Dry run: skipping GitHub API call to load PRs")
+    else:
+        _load_prs(galaxy_root, release_version, release_date, config.owner, config.repo)
 
 
 @cli.command(help="List release blocking PRs")
-@group_options(release_version_argument, release_date_option)
-def check_blocking_prs(release_version: Version, release_date: datetime.date):
+@group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
+def check_blocking_prs(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+    config = load_release_config(galaxy_root, release_version, release_config)
+    if dry_run:
+        click.echo(f"Dry run: would check blocking PRs for milestone {release_version}")
+        sys.exit(0)
     block = 0
-    for pr in _get_prs(release_version, release_date, state="open"):
+    for pr in _get_prs(release_version, config.release_date, config.owner, config.repo, state="open"):
         click.echo(f"Blocking PR| {_pr_to_str(pr)}", err=True)
         block = 1
     sys.exit(block)
 
 
 @cli.command(help="List release blocking issues")
-@group_options(release_version_argument)
-def check_blocking_issues(release_version: Version):
+@group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
+def check_blocking_issues(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+    config = load_release_config(galaxy_root, release_version, release_config)
+    if dry_run:
+        click.echo(f"Dry run: would check blocking issues for milestone {release_version}")
+        sys.exit(0)
     block = 0
     github = github_client()
-    repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
+    repo = github.get_repo(get_repo_name(config.owner, config.repo))
     issues = repo.get_issues(state="open")
     for issue in issues:
         if (
@@ -458,14 +448,20 @@ def _get_prs_file(galaxy_root: Path, release_version: Version) -> Path:
     return _release_file(galaxy_root, f"{release_version}_prs.rst")
 
 
-def _load_prs(galaxy_root: Path, release_version: Version, release_date: datetime.date) -> None:
+def _load_prs(
+    galaxy_root: Path,
+    release_version: Version,
+    release_date: datetime.date,
+    owner: str = PROJECT_OWNER,
+    repo: str = PROJECT_NAME,
+) -> None:
 
     def get_prs_from_prs_file() -> Set[int]:
         with open(_get_prs_file(galaxy_root, release_version)) as fh:
             return set(map(int, re.findall(r"\.\. _Pull Request (\d+): https", fh.read())))
 
     seen_prs = get_prs_from_prs_file()
-    prs = _get_prs(release_version, release_date)
+    prs = _get_prs(release_version, release_date, owner, repo)
     n_prs = len(prs)
     for i, pr in enumerate(prs):
         if pr.number not in seen_prs:
@@ -474,14 +470,22 @@ def _load_prs(galaxy_root: Path, release_version: Version, release_date: datetim
                 galaxy_root=galaxy_root,
                 release_version=release_version,
                 pr=pr,
+                owner=owner,
+                repo=repo,
             )
         else:
             print(f"Skipping PR {i + 1} of {n_prs} (previously processed)")
 
 
-def _get_prs(release_version: Version, release_date: datetime.date, state: str = "closed") -> List[PullRequest]:
+def _get_prs(
+    release_version: Version,
+    release_date: datetime.date,
+    owner: str = PROJECT_OWNER,
+    repo_name: str = PROJECT_NAME,
+    state: str = "closed",
+) -> List[PullRequest]:
     github = github_client()
-    repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
+    repo = github.get_repo(get_repo_name(owner, repo_name))
 
     # A pull request that was last updated before the previous release branch was created cannot be part of this release:
     # the value of `updated_at` is updated on merge, so it had to be merged before the branch existed and, therefore, included in the previous release.
@@ -513,7 +517,14 @@ def _get_prs(release_version: Version, release_date: datetime.date, state: str =
     return prs
 
 
-def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> None:
+def _pr_to_doc(
+    galaxy_root: Path,
+    release_version: Version,
+    pr: PullRequest,
+    owner: str = PROJECT_OWNER,
+    repo: str = PROJECT_NAME,
+) -> None:
+    project_url = get_project_url(owner, repo)
 
     def extend_target(target: str, line: str, source: str) -> str:
         from_str = f".. {target}\n"
@@ -523,15 +534,8 @@ def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> 
 
     def extend_prs_file_content(filename: Path) -> None:
         content = _read_file(filename)
-        text = f".. _Pull Request {pr.number}: {PROJECT_URL}/pull/{pr.number}"
+        text = f".. _Pull Request {pr.number}: {project_url}/pull/{pr.number}"
         content = extend_target("github_links", text, content)
-        _write_file(filename, content)
-
-    def extend_release_file_content(filename: Path) -> None:
-        content = _read_file(filename)
-        text_target = _text_target(pr)
-        if text_target is not None:
-            content = extend_target(text_target, to_doc, content)
         _write_file(filename, content)
 
     def extend_user_announce_file_content(filename: Path) -> None:
@@ -549,7 +553,7 @@ def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> 
         to_doc = pr.title.rstrip(".") + " "
         to_doc += f"\n(thanks to `@{pr.user.login} <https://github.com/{pr.user.login}>`__)."
         to_doc += f"\n`Pull Request {pr.number}`_"
-        return wrap(to_doc)
+        return wrap(to_doc, owner, repo)
 
     to_doc = make_pr_to_doc()
 
@@ -572,10 +576,6 @@ def _write_file(path: Path, contents: str, skip_if_exists: bool = False) -> None
         f.write(contents)
 
 
-def _get_next_release_version(version: Version) -> Version:
-    return Version(f"{version.major}.{version.minor + 1}")
-
-
 def _get_previous_release_version(galaxy_root: Path, version: Version) -> Optional[Version]:
     """Return previous release version if it exists."""
     # NOTE: We convert strings to Version objects to compare apples to apples:
@@ -592,8 +592,8 @@ def _get_previous_release_version(galaxy_root: Path, version: Version) -> Option
 def _get_release_version_strings(galaxy_root: Path) -> List[str]:
     """Return sorted list of release version strings."""
     all_files = _get_release_documentation_filenames(galaxy_root)
-    release_notes_file_pattern = re.compile(r"\d+\.\d+.rst")
-    filenames = [f.rstrip(".rst") for f in all_files if release_notes_file_pattern.match(f)]
+    release_notes_file_pattern = re.compile(r"\d+\.\d+\.rst")
+    filenames = [f[:-4] for f in all_files if release_notes_file_pattern.match(f)]
     return sorted(filenames)
 
 
@@ -612,17 +612,17 @@ def _release_file(galaxy_root: Path, filename: Optional[str]) -> Path:
     return galaxy_root / "doc" / "source" / "releases" / filename
 
 
-def _process_sentence(message: str) -> str:
+def _process_sentence(message: str, owner: str = PROJECT_OWNER, repo: str = PROJECT_NAME) -> str:
     # Strip tags like [15.07].
     message = strip_release(message=message)
     # Link issues and pull requests...
-    issue_url = f"https://github.com/{PROJECT_OWNER}/{PROJECT_NAME}/issues"
+    issue_url = f"https://github.com/{owner}/{repo}/issues"
     message = re.sub(r"#(\d+)", rf"`#\1 <{issue_url}/\1>`__", message)
     return message
 
 
-def wrap(message: str) -> str:
-    message = _process_sentence(message)
+def wrap(message: str, owner: str = PROJECT_OWNER, repo: str = PROJECT_NAME) -> str:
+    message = _process_sentence(message, owner, repo)
     wrapper = textwrap.TextWrapper(initial_indent="* ")
     wrapper.subsequent_indent = "  "
     wrapper.width = 160

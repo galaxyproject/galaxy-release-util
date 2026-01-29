@@ -47,3 +47,11 @@ class ClickDate(click.ParamType):
             return datetime.datetime.strptime(value, "%Y-%m-%d").date()
         except ValueError as e:
             self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)
+
+
+release_config_option = click.option(
+    "--release-config",
+    type=click.Path(exists=True, path_type=pathlib.Path),
+    default=None,
+    help="Path to release config YAML. Default: {galaxy-root}/doc/source/releases/release_{version}.yml",
+)

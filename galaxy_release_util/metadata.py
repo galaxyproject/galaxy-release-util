@@ -97,5 +97,13 @@ def _pr_to_labels(pr: PullRequest) -> List[str]:
     return labels
 
 
+def get_project_url(owner: str, name: str) -> str:
+    return f"https://github.com/{owner}/{name}"
+
+
+def get_repo_name(owner: str, name: str) -> str:
+    return f"{owner}/{name}"
+
+
 def strip_release(message):
     return re.sub(r"^\s*\[[\w,\.,-]*\]\s*", r"", message)

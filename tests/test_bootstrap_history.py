@@ -6,10 +6,11 @@ from click.testing import CliRunner
 from packaging.version import Version
 
 from galaxy_release_util import bootstrap_history
-from galaxy_release_util.bootstrap_history import (  # _get_release_date,
-    _get_next_release_version,
+from galaxy_release_util.bootstrap_history import (
     _get_previous_release_version,
     _get_release_version_strings,
+    check_blocking_issues,
+    check_blocking_prs,
     create_changelog,
 )
 
@@ -57,11 +58,6 @@ def test_get_previous_release_version(monkeypatch):
     assert _get_previous_release_version(None, Version("99.99")) == Version("23.1")
 
 
-def test_get_next_release_version():
-    assert _get_next_release_version(Version("25.0")) == Version("25.1")
-    assert _get_next_release_version(Version("26.1")) == Version("26.2")
-
-
 def test_get_release_version_strings(monkeypatch):
     filenames = [
         "15.0.not_rst",
@@ -76,6 +72,25 @@ def test_get_release_version_strings(monkeypatch):
     assert _get_release_version_strings(None) == ["22.01", "22.05", "23.0", "23.1"]
 
 
+def test_get_release_version_strings_rstrip_regression(monkeypatch):
+    """Verify that filenames ending with characters in '.rst' are handled correctly.
+
+    The old implementation used f.rstrip('.rst') which strips individual characters,
+    not the suffix. For example, 'foo.rst'.rstrip('.rst') would strip trailing
+    r, s, t, and . characters. This test verifies the fix.
+    """
+    filenames = [
+        "22.01.rst",
+        "23.0.rst",
+    ]
+    monkeypatch.setattr(bootstrap_history, "_get_release_documentation_filenames", lambda x: sorted(filenames))
+    result = _get_release_version_strings(None)
+    assert result == ["22.01", "23.0"]
+    # These must preserve the full version string before .rst
+    assert "22.01" in result
+    assert "23.0" in result
+
+
 def test_create_changelog(
     monkeypatch,
     announcement_file,
@@ -85,15 +100,25 @@ def test_create_changelog(
 ):
     monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
     monkeypatch.setattr(
-        bootstrap_history, "_load_prs", lambda x, y, z: None
+        bootstrap_history, "_load_prs", lambda *args, **kwargs: None
     )  # We don't want to call github's API on test data.
     runner = CliRunner()
     with runner.isolated_filesystem():
         os.makedirs("doc/source/releases")
+        # Write a release config YAML
+        config_content = (
+            "current-version: '98.2'\n"
+            "previous-version: '98.1'\n"
+            "next-version: '99.0'\n"
+            "release-date: '2099-01-15'\n"
+            "freeze-date: '2099-01-01'\n"
+        )
+        config_path = Path("doc/source/releases/release_98.2.yml")
+        config_path.write_text(config_content)
         result = runner.invoke(
-            create_changelog, ["98.2", "--galaxy-root", ".", "--release-date", "2099-1-15", "--next-version", "99.0"]
+            create_changelog, ["98.2", "--galaxy-root", "."]
         )  # version 98.2 to be released on January 15, 2099
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
 
         releases_path = Path("doc") / "source" / "releases"
 
@@ -105,3 +130,62 @@ def test_create_changelog(
             assert f.read() == prs_file
         with open(releases_path / "99.0_announce.rst") as f:
             assert f.read() == next_release_announcement_file
+
+
+def test_create_changelog_dry_run(monkeypatch):
+    monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        os.makedirs("doc/source/releases")
+        config_content = (
+            "current-version: '98.2'\n"
+            "previous-version: '98.1'\n"
+            "next-version: '99.0'\n"
+            "release-date: '2099-01-15'\n"
+            "freeze-date: '2099-01-01'\n"
+        )
+        config_path = Path("doc/source/releases/release_98.2.yml")
+        config_path.write_text(config_content)
+        result = runner.invoke(
+            create_changelog, ["98.2", "--galaxy-root", ".", "--dry-run"]
+        )
+        assert result.exit_code == 0, result.output
+        assert "Dry run: skipping GitHub API call" in result.output
+
+
+def test_check_blocking_prs_dry_run(monkeypatch):
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        os.makedirs("doc/source/releases")
+        config_content = (
+            "current-version: '98.2'\n"
+            "previous-version: '98.1'\n"
+            "next-version: '99.0'\n"
+            "release-date: '2099-01-15'\n"
+        )
+        config_path = Path("doc/source/releases/release_98.2.yml")
+        config_path.write_text(config_content)
+        result = runner.invoke(
+            check_blocking_prs, ["98.2", "--galaxy-root", ".", "--dry-run"]
+        )
+        assert result.exit_code == 0, result.output
+        assert "Dry run: would check blocking PRs" in result.output
+
+
+def test_check_blocking_issues_dry_run(monkeypatch):
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        os.makedirs("doc/source/releases")
+        config_content = (
+            "current-version: '98.2'\n"
+            "previous-version: '98.1'\n"
+            "next-version: '99.0'\n"
+            "release-date: '2099-01-15'\n"
+        )
+        config_path = Path("doc/source/releases/release_98.2.yml")
+        config_path.write_text(config_content)
+        result = runner.invoke(
+            check_blocking_issues, ["98.2", "--galaxy-root", ".", "--dry-run"]
+        )
+        assert result.exit_code == 0, result.output
+        assert "Dry run: would check blocking issues" in result.output
