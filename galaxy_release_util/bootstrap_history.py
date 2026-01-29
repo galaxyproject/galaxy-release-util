@@ -255,7 +255,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
           git checkout release_${version} -b ${version}_release_notes
     - [ ] Bootstrap the release notes
 
-          galaxy-release-util create-changelog ${version} --galaxy-root .
+          galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
     - [ ] Open newly created files and manually curate major topics and release notes.
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
@@ -283,7 +283,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are the not [${next_version} milestones](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
-          galaxy-release-util create-changelog ${version} --galaxy-root .
+          galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
 
