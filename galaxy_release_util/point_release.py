@@ -32,7 +32,10 @@ from .cli.options import (
 )
 from .github_client import github_client
 from .metadata import (
+    PROJECT_NAME,
+    PROJECT_OWNER,
     _text_target,
+    get_repo_name,
     strip_release,
 )
 from .util import (
@@ -40,10 +43,7 @@ from .util import (
     version_filepath,
 )
 
-g = github_client()
-PROJECT_OWNER = "galaxyproject"
-PROJECT_NAME = "galaxy"
-REPO = f"{PROJECT_OWNER}/{PROJECT_NAME}"
+REPO = get_repo_name(PROJECT_OWNER, PROJECT_NAME)
 DEFAULT_UPSTREAM_URL = f"https://github.com/{REPO}.git"
 
 HISTORY_TEMPLATE = """History
@@ -292,11 +292,12 @@ def bump_package_version(package: Package, new_version: Version) -> None:
     package.modified_paths.append(package.setup_cfg)
 
 
-def commits_to_prs(packages: List[Package]) -> None:
+def commits_to_prs(packages: List[Package], owner: str = PROJECT_OWNER, repo_name: str = PROJECT_NAME) -> None:
+    g = github_client()
     commits = set.union(*(p.commits for p in packages))
     pr_cache = {}
     commit_to_pr = {}
-    repo = g.get_repo(REPO)
+    repo = g.get_repo(get_repo_name(owner, repo_name))
     total_commits = len(commits)
     for i, commit in enumerate(commits):
         click.echo(f"Processing commit {i + 1} of {total_commits}")
