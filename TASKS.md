@@ -115,7 +115,7 @@ export GITHUB_AUTH=<TOKEN>
 
 ### Step 6: Create Release Config YAML
 
-All release metadata is stored in a YAML config file. This file is required by `galaxy-release-util` commands and replaces the individual `--freeze-date`, `--release-date`, and `--next-version` flags.
+All release metadata is defined in a single YAML config file. Once committed, all `galaxy-release-util` commands load it automatically from the default path given a release version.
 
 1. Change to your Galaxy root directory:
 
