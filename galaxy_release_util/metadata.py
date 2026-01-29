@@ -5,8 +5,6 @@ from github.PullRequest import PullRequest
 
 PROJECT_OWNER = "galaxyproject"
 PROJECT_NAME = "galaxy"
-PROJECT_URL = f"https://github.com/{PROJECT_OWNER}/{PROJECT_NAME}"
-PROJECT_API = f"https://api.github.com/repos/{PROJECT_OWNER}/{PROJECT_NAME}/"
 
 GROUPED_TAGS = dict(
     [
@@ -22,8 +20,6 @@ GROUPED_TAGS = dict(
 
 
 def _pr_to_str(pr):
-    if isinstance(pr, str):
-        return pr
     return f"PR #{pr.number} ({pr.title}) {pr.html_url}"
 
 
@@ -59,7 +55,7 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
         print(f"No 'kind/*' or 'minor' or 'merge' or 'procedures' label found for {_pr_to_str(pull_request)}")
         text_target = None
 
-    if is_minor or is_merge and skip_merge:
+    if (is_minor or is_merge) and skip_merge:
         return
 
     if is_some_kind_of_enhancement and is_major:
@@ -95,6 +91,14 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
 def _pr_to_labels(pr: PullRequest) -> List[str]:
     labels = [label.name.lower() for label in pr.labels]
     return labels
+
+
+def get_project_url(owner: str, name: str) -> str:
+    return f"https://github.com/{owner}/{name}"
+
+
+def get_repo_name(owner: str, name: str) -> str:
+    return f"{owner}/{name}"
 
 
 def strip_release(message):
