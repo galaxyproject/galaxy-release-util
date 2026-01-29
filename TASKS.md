@@ -113,7 +113,33 @@ export GITHUB_AUTH=<TOKEN>
 
 ---
 
-### Step 6: Open New Release Publication Issue
+### Step 6: Create Release Config YAML
+
+All release metadata is stored in a YAML config file. This file is required by `galaxy-release-util` commands and replaces the individual `--freeze-date`, `--release-date`, and `--next-version` flags.
+
+1. Change to your Galaxy root directory:
+
+```bash
+cd <GALAXY_ROOT>
+```
+
+2. Create the release config file at `doc/source/releases/release_<RELEASE_TAG>.yml`:
+
+```yaml
+current-version: "<RELEASE_TAG>"
+previous-version: "<PREVIOUS_RELEASE_TAG>"
+next-version: "<NEXT_RELEASE_TAG>"
+freeze-date: "<FREEZE_DATE>"
+release-date: "<RELEASE_DATE>"
+```
+
+All fields except `freeze-date` are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository.
+
+3. Commit this file to the repository so it is available for all subsequent release commands.
+
+---
+
+### Step 7: Open New Release Publication Issue
 
 Using `galaxy-release-util`, create the release publication issue that tracks all publication tasks for the current release.
 
@@ -128,14 +154,16 @@ cd <GALAXY_ROOT>
 3. Review the generated release issue content:
 
 ```bash
-galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --release-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run yes
+galaxy-release-util create-release-issue <RELEASE_TAG> --galaxy-root . --dry-run
 ```
+
+To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
 
 4. Re run the command without `--dry-run` to open the issue on GitHub.
 
 ---
 
-### Step 7: Create Milestone for Next Release
+### Step 8: Create Milestone for Next Release
 
 Create a milestone for the next release so new pull requests are tagged correctly.
 
@@ -155,7 +183,7 @@ https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>
 
 ---
 
-### Step 8: Freeze Meeting
+### Step 9: Freeze Meeting
 
 One week before the freeze, hold the Freeze Meeting, usually during a weekly dev meeting. In this meeting, review open pull requests, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges complete before the freeze. Milestone decisions made here are binding for the freeze.
 
@@ -169,7 +197,7 @@ is:open is:pr milestone:<RELEASE_TAG> -label:kind/bug -is:draft
 
 ---
 
-### Step 9: Final Pre Freeze Milestone and Label Audit
+### Step 10: Final Pre Freeze Milestone and Label Audit
 
 Before freezing, ensure all pull requests in the milestone have appropriate `kind/*` labels and correct milestone assignment.
 
@@ -183,7 +211,7 @@ is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -l
 
 ---
 
-### Step 10: Confirm and Announce Freeze
+### Step 11: Confirm and Announce Freeze
 
 After completing the audit, the release manager confirms the freeze and announces it.
 
@@ -197,7 +225,7 @@ Send the following message:
 
 ---
 
-### Step 11: Review Merged Pull Requests
+### Step 12: Review Merged Pull Requests
 
 Ensure all merged pull requests for the release are correctly labeled and titled to support accurate release notes.
 
@@ -213,7 +241,7 @@ is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PREVIOUS-RELEAS
 
 ---
 
-### Step 12: Update Database Revision
+### Step 13: Update Database Revision
 
 Update the database revision mapping for the release. This change must land before branching.
 
@@ -241,7 +269,7 @@ git pull upstream dev
 
 ---
 
-### Step 13: Merge Previous Release into dev
+### Step 14: Merge Previous Release into dev
 
 Merge the previous release branch into `dev` to ensure all backported fixes are present.
 
@@ -265,7 +293,7 @@ git push
 
 ---
 
-### Step 14: Create Release Candidate Branches
+### Step 15: Create Release Candidate Branches
 
 Create release candidate and next dev version branches.
 
@@ -301,7 +329,7 @@ Note: These steps may silently fail without producing any branches. Inspect `cat
 
 ---
 
-### Step 15: Create a new GitHub label
+### Step 16: Create a new GitHub label
 
 * Navigate to https://github.com/galaxyproject/galaxy/issues
 * Click on `Labels` and `New label`
@@ -310,7 +338,7 @@ Note: These steps may silently fail without producing any branches. Inspect `cat
 
 ---
 
-### Step 16: Announce Branching
+### Step 17: Announce Branching
 
 Send the following message:
 
