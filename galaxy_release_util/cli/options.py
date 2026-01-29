@@ -1,4 +1,3 @@
-import datetime
 import pathlib
 from typing import (
     Any,
@@ -37,16 +36,6 @@ class ClickVersion(click.ParamType):
             return Version(value)
         except ValueError as e:
             self.fail(f"{value!r} is not a valid PEP440 version number: {str(e)}", param, ctx)
-
-
-class ClickDate(click.ParamType):
-    name = "date"
-
-    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> datetime.date:
-        try:
-            return datetime.datetime.strptime(value, "%Y-%m-%d").date()
-        except ValueError as e:
-            self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)
 
 
 release_config_option = click.option(

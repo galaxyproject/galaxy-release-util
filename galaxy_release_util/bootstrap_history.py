@@ -251,7 +251,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
           git checkout release_${version} -b ${version}_release_notes
     - [ ] Bootstrap the release notes
 
-          galaxy-release-util create-changelog ${version} --release-date ${release_date} --next-version ${next_version}
+          galaxy-release-util create-changelog ${version} --galaxy-root .
     - [ ] Open newly created files and manually curate major topics and release notes.
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
@@ -271,15 +271,15 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Ensure all [blocking milestone issues](https://github.com/galaxyproject/galaxy/issues?q=is%3Aopen+is%3Aissue+milestone%3A${version}) have been resolved.
 
-          galaxy-release-util check-blocking-issues ${version}
+          galaxy-release-util check-blocking-issues ${version} --galaxy-root .
     - [ ] Ensure all [blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}) have been merged, closed, or postponed until the next release.
 
-          galaxy-release-util check-blocking-prs ${version} --release-date ${release_date}
+          galaxy-release-util check-blocking-prs ${version} --galaxy-root .
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze have [milestones attached](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+no%3Amilestone)
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are the not [${next_version} milestones](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
-          galaxy-release-util create-changelog ${version} --release-date ${release_date} --next-version ${next_version}
+          galaxy-release-util create-changelog ${version} --galaxy-root .
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
 
@@ -410,6 +410,7 @@ def create_changelog(release_version: Version, galaxy_root: Path, release_config
 @cli.command(help="List release blocking PRs")
 @group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
 def check_blocking_prs(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+    verify_galaxy_root(galaxy_root)
     config = load_release_config(galaxy_root, release_version, release_config)
     if dry_run:
         click.echo(f"Dry run: would check blocking PRs for milestone {release_version}")
@@ -424,6 +425,7 @@ def check_blocking_prs(release_version: Version, galaxy_root: Path, release_conf
 @cli.command(help="List release blocking issues")
 @group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
 def check_blocking_issues(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+    verify_galaxy_root(galaxy_root)
     config = load_release_config(galaxy_root, release_version, release_config)
     if dry_run:
         click.echo(f"Dry run: would check blocking issues for milestone {release_version}")

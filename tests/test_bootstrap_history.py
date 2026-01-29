@@ -104,6 +104,7 @@ def test_create_changelog_dry_run(monkeypatch):
 
 
 def test_check_blocking_prs_dry_run(monkeypatch):
+    monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
     runner = CliRunner()
     with runner.isolated_filesystem():
         os.makedirs("doc/source/releases")
@@ -123,6 +124,7 @@ def test_check_blocking_prs_dry_run(monkeypatch):
 
 
 def test_check_blocking_issues_dry_run(monkeypatch):
+    monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
     runner = CliRunner()
     with runner.isolated_filesystem():
         os.makedirs("doc/source/releases")

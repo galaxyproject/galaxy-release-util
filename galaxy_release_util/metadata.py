@@ -57,7 +57,7 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
         print(f"No 'kind/*' or 'minor' or 'merge' or 'procedures' label found for {_pr_to_str(pull_request)}")
         text_target = None
 
-    if is_minor or is_merge and skip_merge:
+    if (is_minor or is_merge) and skip_merge:
         return
 
     if is_some_kind_of_enhancement and is_major:
