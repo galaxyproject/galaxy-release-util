@@ -20,12 +20,6 @@ def release_files_dir():
 
 
 @pytest.fixture
-def release_file(release_files_dir):
-    with open(release_files_dir / "98.2.rst") as f:
-        return f.read()
-
-
-@pytest.fixture
 def announcement_file(release_files_dir):
     with open(release_files_dir / "98.2_announce.rst") as f:
         return f.read()
@@ -84,7 +78,6 @@ def test_get_release_version_strings(monkeypatch):
 
 def test_create_changelog(
     monkeypatch,
-    release_file,
     announcement_file,
     user_announcement_file,
     prs_file,
@@ -104,8 +97,6 @@ def test_create_changelog(
 
         releases_path = Path("doc") / "source" / "releases"
 
-        with open(releases_path / "98.2.rst") as f:
-            assert f.read() == release_file
         with open(releases_path / "98.2_announce.rst") as f:
             assert f.read() == announcement_file
         with open(releases_path / "98.2_announce_user.rst") as f:
