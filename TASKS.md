@@ -355,4 +355,31 @@ Send this message to at least the following channels:
 
 ---
 
-### Step 18: Continue with Release Issue
+### Step 18: Assemble Testing Team
+
+Reach out per email to assemble the testing team for the upcoming release:
+
+>**Galaxy <RELEASE_TAG> Release Testing**
+>
+>Hi,
+>
+>I am organizing testing for the upcoming Galaxy release and would like to ask whether you would be available to participate.
+>
+>**Testing window:**
+>**<DAY_NAME> <MONTH_NAME> <DAY_COUNT>** through **<DAY_NAME> <MONTH_NAME> <DAY_COUNT>**
+>
+>**Time commitment:**
+>Approximately four hours per day. Testing consists of working through as many assigned PRs as time permits. There will be one short kick off meeting immediately before testing begins.
+>
+>**What release testing involves:**
+>Release testing focuses on validating Galaxy GitHub pull requests. Each PR represents either a new feature, an enhancement, or a bug fix. Testing means exercising the changes as a user would and verifying that they behave correctly and do not introduce regressions. A curated list of PRs will be provided, and detailed guidance on the testing workflow and PR selection will be covered in the kick off meeting.
+>
+>I will be available throughout the testing period, and the galaxyproject/release-testing channel on Element will be used for coordination and questions.
+>
+>If you are able to participate, I will follow up with concrete details.
+>
+>Thanks!
+
+---
+
+### Step 19: Continue with Release Issue
