@@ -135,7 +135,7 @@ freeze-date: "<FREEZE_DATE>"
 release-date: "<RELEASE_DATE>"
 ```
 
-All fields except `freeze-date` are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository.
+All fields are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository.
 
 3. Commit this file to the repository so it is available for all subsequent release commands.
 

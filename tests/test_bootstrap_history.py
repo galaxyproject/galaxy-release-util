@@ -161,3 +161,22 @@ def test_create_release_issue_rejects_invalid_next_version(monkeypatch):
         )
         assert result.exit_code != 0
         assert "Next release version should be greater than current version" in str(result.exception)
+
+
+def test_create_release_issue_rejects_missing_freeze_date(monkeypatch):
+    monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        os.makedirs("doc/source/releases")
+        config_content = (
+            "current-version: '98.2'\n"
+            "previous-version: '98.1'\n"
+            "next-version: '99.0'\n"
+            "release-date: '2099-01-15'\n"
+        )
+        Path("doc/source/releases/release_98.2.yml").write_text(config_content)
+        result = runner.invoke(
+            create_release_issue, ["98.2", "--galaxy-root", ".", "--dry-run"]
+        )
+        assert result.exit_code != 0
+        assert "freeze-date is required" in result.output
