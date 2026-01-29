@@ -24,14 +24,14 @@ def test_load_release_config_default_path(tmp_path, config_dir):
     _write_config(
         config_dir,
         "release_98.2.yml",
-        "current-version: '98.2'\nprevious-version: '98.1'\nnext-version: '99.0'\nrelease-date: '2099-01-15'\n",
+        "current-version: '98.2'\nprevious-version: '98.1'\nnext-version: '99.0'\nfreeze-date: '2099-01-01'\nrelease-date: '2099-01-15'\n",
     )
     config = load_release_config(tmp_path, Version("98.2"))
     assert config.current_version == Version("98.2")
     assert config.previous_version == Version("98.1")
     assert config.next_version == Version("99.0")
     assert config.release_date == datetime.date(2099, 1, 15)
-    assert config.freeze_date is None
+    assert config.freeze_date == datetime.date(2099, 1, 1)
     assert config.owner == "galaxyproject"
     assert config.repo == "galaxy"
 
@@ -71,33 +71,23 @@ def test_load_release_config_cli_only(tmp_path):
         previous_version=Version("98.0"),
         next_version=Version("99.1"),
         release_date=datetime.date(2099, 1, 15),
+        freeze_date=datetime.date(2099, 1, 1),
     )
     assert config.current_version == Version("99.0")
     assert config.previous_version == Version("98.0")
     assert config.next_version == Version("99.1")
     assert config.release_date == datetime.date(2099, 1, 15)
-    assert config.freeze_date is None
+    assert config.freeze_date == datetime.date(2099, 1, 1)
     assert config.owner == "galaxyproject"
     assert config.repo == "galaxy"
 
-
-def test_load_release_config_cli_with_freeze_date(tmp_path):
-    config = load_release_config(
-        tmp_path,
-        Version("99.0"),
-        previous_version=Version("98.0"),
-        next_version=Version("99.1"),
-        release_date=datetime.date(2099, 1, 15),
-        freeze_date=datetime.date(2099, 1, 1),
-    )
-    assert config.freeze_date == datetime.date(2099, 1, 1)
 
 
 def test_load_release_config_cli_overrides_yaml(tmp_path, config_dir):
     _write_config(
         config_dir,
         "release_98.2.yml",
-        "current-version: '98.2'\nprevious-version: '98.1'\nnext-version: '99.0'\nrelease-date: '2099-01-15'\n",
+        "current-version: '98.2'\nprevious-version: '98.1'\nnext-version: '99.0'\nfreeze-date: '2099-01-01'\nrelease-date: '2099-01-15'\n",
     )
     config = load_release_config(
         tmp_path, Version("98.2"),
@@ -124,7 +114,7 @@ def test_load_release_config_null_required_field(tmp_path, config_dir):
     _write_config(
         config_dir,
         "release_99.0.yml",
-        "current-version: '99.0'\nprevious-version:\nnext-version: '99.1'\nrelease-date: '2099-01-15'\n",
+        "current-version: '99.0'\nprevious-version:\nnext-version: '99.1'\nfreeze-date: '2099-01-01'\nrelease-date: '2099-01-15'\n",
     )
     with pytest.raises(ValueError, match="has no value"):
         load_release_config(tmp_path, Version("99.0"))
@@ -134,7 +124,7 @@ def test_load_release_config_invalid_version(tmp_path, config_dir):
     _write_config(
         config_dir,
         "release_99.0.yml",
-        "current-version: '!!!'\nprevious-version: '98.0'\nnext-version: '99.1'\nrelease-date: '2099-01-15'\n",
+        "current-version: '!!!'\nprevious-version: '98.0'\nnext-version: '99.1'\nfreeze-date: '2099-01-01'\nrelease-date: '2099-01-15'\n",
     )
     with pytest.raises(ValueError, match="Invalid 'current-version'"):
         load_release_config(tmp_path, Version("99.0"))
@@ -144,7 +134,7 @@ def test_load_release_config_invalid_date(tmp_path, config_dir):
     _write_config(
         config_dir,
         "release_99.0.yml",
-        "current-version: '99.0'\nprevious-version: '98.0'\nnext-version: '99.1'\nrelease-date: 'not-a-date'\n",
+        "current-version: '99.0'\nprevious-version: '98.0'\nnext-version: '99.1'\nfreeze-date: '2099-01-01'\nrelease-date: 'not-a-date'\n",
     )
     with pytest.raises(ValueError, match="Invalid 'release-date'"):
         load_release_config(tmp_path, Version("99.0"))
@@ -156,7 +146,7 @@ def test_load_release_config_null_freeze_date(tmp_path, config_dir):
         "release_99.0.yml",
         "current-version: '99.0'\nprevious-version: '98.0'\nnext-version: '99.1'\nrelease-date: '2099-01-15'\nfreeze-date:\n",
     )
-    with pytest.raises(ValueError, match="'freeze-date' is present but has no value"):
+    with pytest.raises(ValueError, match="has no value"):
         load_release_config(tmp_path, Version("99.0"))
 
 
@@ -174,7 +164,7 @@ def test_load_release_config_version_mismatch(tmp_path, config_dir):
     _write_config(
         config_dir,
         "release_99.0.yml",
-        "current-version: '98.0'\nprevious-version: '97.0'\nnext-version: '99.0'\nrelease-date: '2099-01-15'\n",
+        "current-version: '98.0'\nprevious-version: '97.0'\nnext-version: '99.0'\nfreeze-date: '2099-01-01'\nrelease-date: '2099-01-15'\n",
     )
     with pytest.raises(ValueError, match="does not match release-version argument"):
         load_release_config(tmp_path, Version("99.0"), release_config_path=config_dir / "release_99.0.yml")

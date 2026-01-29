@@ -13,7 +13,7 @@ class ReleaseConfig:
     previous_version: Version
     next_version: Version
     release_date: datetime.date
-    freeze_date: Optional[datetime.date] = None
+    freeze_date: datetime.date
     owner: str = "galaxyproject"
     repo: str = "galaxy"
 
@@ -57,6 +57,8 @@ def load_release_config(
         missing.append("--next-version")
     if release_date is None:
         missing.append("--release-date")
+    if freeze_date is None:
+        missing.append("--freeze-date")
     if missing:
         raise ValueError(
             f"No release config YAML found and missing required flag(s): {', '.join(missing)}. "
@@ -94,7 +96,7 @@ def _load_yaml_file(path: Path, release_version: Version) -> ReleaseConfig:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         raise ValueError(f"Release config must be a YAML mapping, got {type(data).__name__} in {path}")
-    required_fields = ["current-version", "previous-version", "next-version", "release-date"]
+    required_fields = ["current-version", "previous-version", "next-version", "freeze-date", "release-date"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ValueError(
@@ -121,14 +123,10 @@ def _load_yaml_file(path: Path, release_version: Version) -> ReleaseConfig:
         release_date = _parse_date(data["release-date"])
     except Exception as e:
         raise ValueError(f"Invalid 'release-date' value {data['release-date']!r} in {path}: {e}")
-    freeze_date: Optional[datetime.date] = None
-    if "freeze-date" in data:
-        if data["freeze-date"] is None:
-            raise ValueError(f"Field 'freeze-date' is present but has no value in {path}")
-        try:
-            freeze_date = _parse_date(data["freeze-date"])
-        except Exception as e:
-            raise ValueError(f"Invalid 'freeze-date' value {data['freeze-date']!r} in {path}: {e}")
+    try:
+        freeze_date = _parse_date(data["freeze-date"])
+    except Exception as e:
+        raise ValueError(f"Invalid 'freeze-date' value {data['freeze-date']!r} in {path}: {e}")
     if current_version != release_version:
         raise ValueError(
             f"'current-version' in config ({current_version}) does not match "

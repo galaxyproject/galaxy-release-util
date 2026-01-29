@@ -114,6 +114,7 @@ def test_check_blocking_prs_dry_run(monkeypatch):
             "previous-version: '98.1'\n"
             "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
+            "freeze-date: '2099-01-01'\n"
         )
         config_path = Path("doc/source/releases/release_98.2.yml")
         config_path.write_text(config_content)
@@ -134,6 +135,7 @@ def test_check_blocking_issues_dry_run(monkeypatch):
             "previous-version: '98.1'\n"
             "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
+            "freeze-date: '2099-01-01'\n"
         )
         config_path = Path("doc/source/releases/release_98.2.yml")
         config_path.write_text(config_content)
@@ -154,6 +156,7 @@ def test_create_release_issue_rejects_invalid_next_version(monkeypatch):
             "previous-version: '98.1'\n"
             "next-version: '98.0'\n"
             "release-date: '2099-01-15'\n"
+            "freeze-date: '2099-01-01'\n"
         )
         Path("doc/source/releases/release_98.2.yml").write_text(config_content)
         result = runner.invoke(
@@ -179,4 +182,5 @@ def test_create_release_issue_rejects_missing_freeze_date(monkeypatch):
             create_release_issue, ["98.2", "--galaxy-root", ".", "--dry-run"]
         )
         assert result.exit_code != 0
-        assert "freeze-date is required" in result.output
+        assert "Missing required field" in str(result.exception)
+        assert "freeze-date" in str(result.exception)

@@ -352,8 +352,6 @@ def create_release_issue(
         previous_version, next_version, release_date, freeze_date,
     )
     assert config.next_version > config.current_version, "Next release version should be greater than current version"
-    if config.freeze_date is None:
-        raise click.UsageError("freeze-date is required for create-release-issue (set it in the config YAML or pass --freeze-date)")
 
     issue_template_params = dict(
         version=release_version,
