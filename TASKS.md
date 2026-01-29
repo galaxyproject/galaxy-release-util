@@ -323,7 +323,7 @@ b. `version-<RELEASE_TAG>.rc1`
 
 * Title: Update version to <RELEASE_TAG>.rc1
 * Open a pull request against galaxyproject:release_<RELEASE_TAG>.
-*  Example: https://github.com/galaxyproject/galaxy/pull/21019
+* Example: https://github.com/galaxyproject/galaxy/pull/21019
 
 Note: These steps may silently fail without producing any branches. Inspect `cat packages/app/make-dist.log` if branches were not created.
 
@@ -350,3 +350,7 @@ Send this message to at least the following channels:
 
 * [https://matrix.to/#/#galaxyproject_ui-ux:gitter.im](https://matrix.to/#/#galaxyproject_ui-ux:gitter.im)
 * [https://matrix.to/#/#galaxyproject_backend:gitter.im](https://matrix.to/#/#galaxyproject_backend:gitter.im)
+
+---
+
+### Step 18: Continue with Release Issue
