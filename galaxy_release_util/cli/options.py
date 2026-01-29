@@ -1,3 +1,4 @@
+import datetime
 import pathlib
 from typing import (
     Any,
@@ -38,9 +39,47 @@ class ClickVersion(click.ParamType):
             self.fail(f"{value!r} is not a valid PEP440 version number: {str(e)}", param, ctx)
 
 
+class ClickDate(click.ParamType):
+    name = "date"
+
+    def convert(self, value: Any, param: Optional[Parameter], ctx: Optional[Context]) -> datetime.date:
+        try:
+            return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError as e:
+            self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)
+
+
 release_config_option = click.option(
     "--release-config",
     type=click.Path(exists=True, path_type=pathlib.Path),
     default=None,
     help="Path to release config YAML. Default: {galaxy-root}/doc/source/releases/release_{version}.yml",
+)
+
+previous_version_option = click.option(
+    "--previous-version",
+    type=ClickVersion(),
+    default=None,
+    help="Previous release version (overrides config YAML).",
+)
+
+next_version_option = click.option(
+    "--next-version",
+    type=ClickVersion(),
+    default=None,
+    help="Next release version (overrides config YAML).",
+)
+
+release_date_option = click.option(
+    "--release-date",
+    type=ClickDate(),
+    default=None,
+    help="Release date in YYYY-MM-DD format (overrides config YAML).",
+)
+
+freeze_date_option = click.option(
+    "--freeze-date",
+    type=ClickDate(),
+    default=None,
+    help="Freeze date in YYYY-MM-DD format (overrides config YAML).",
 )

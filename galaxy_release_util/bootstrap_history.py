@@ -21,9 +21,13 @@ from packaging.version import Version
 
 from .cli.options import (
     ClickVersion,
+    freeze_date_option,
     galaxy_root_option,
     group_options,
+    next_version_option,
+    previous_version_option,
     release_config_option,
+    release_date_option,
 )
 from .github_client import github_client
 from .metadata import (
@@ -326,16 +330,27 @@ def cli():
     release_version_argument,
     galaxy_root_option,
     release_config_option,
+    previous_version_option,
+    next_version_option,
+    release_date_option,
+    freeze_date_option,
     dry_run_option,
 )
 def create_release_issue(
     release_version: Version,
     galaxy_root: Path,
     release_config: Optional[Path],
+    previous_version: Optional[Version],
+    next_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(galaxy_root, release_version, release_config)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, next_version, release_date, freeze_date,
+    )
     assert config.next_version > release_version, "Next release version should be greater than release version"
 
     issue_template_params = dict(
@@ -368,10 +383,31 @@ def create_release_issue(
 
 
 @cli.command(help="Create or update release changelog")
-@group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
-def create_changelog(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+@group_options(
+    release_version_argument,
+    galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    next_version_option,
+    release_date_option,
+    freeze_date_option,
+    dry_run_option,
+)
+def create_changelog(
+    release_version: Version,
+    galaxy_root: Path,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    next_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
+    dry_run: bool,
+):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(galaxy_root, release_version, release_config)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, next_version, release_date, freeze_date,
+    )
     release_date = config.release_date
     next_version = config.next_version
 
@@ -408,10 +444,31 @@ def create_changelog(release_version: Version, galaxy_root: Path, release_config
 
 
 @cli.command(help="List release blocking PRs")
-@group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
-def check_blocking_prs(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+@group_options(
+    release_version_argument,
+    galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    next_version_option,
+    release_date_option,
+    freeze_date_option,
+    dry_run_option,
+)
+def check_blocking_prs(
+    release_version: Version,
+    galaxy_root: Path,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    next_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
+    dry_run: bool,
+):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(galaxy_root, release_version, release_config)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, next_version, release_date, freeze_date,
+    )
     if dry_run:
         click.echo(f"Dry run: would check blocking PRs for milestone {release_version}")
         sys.exit(0)
@@ -423,10 +480,31 @@ def check_blocking_prs(release_version: Version, galaxy_root: Path, release_conf
 
 
 @cli.command(help="List release blocking issues")
-@group_options(release_version_argument, galaxy_root_option, release_config_option, dry_run_option)
-def check_blocking_issues(release_version: Version, galaxy_root: Path, release_config: Optional[Path], dry_run: bool):
+@group_options(
+    release_version_argument,
+    galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    next_version_option,
+    release_date_option,
+    freeze_date_option,
+    dry_run_option,
+)
+def check_blocking_issues(
+    release_version: Version,
+    galaxy_root: Path,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    next_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
+    dry_run: bool,
+):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(galaxy_root, release_version, release_config)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, next_version, release_date, freeze_date,
+    )
     if dry_run:
         click.echo(f"Dry run: would check blocking issues for milestone {release_version}")
         sys.exit(0)
