@@ -576,36 +576,6 @@ def _write_file(path: Path, contents: str, skip_if_exists: bool = False) -> None
         f.write(contents)
 
 
-def _get_previous_release_version(galaxy_root: Path, version: Version) -> Optional[Version]:
-    """Return previous release version if it exists."""
-    # NOTE: We convert strings to Version objects to compare apples to apples:
-    # str(Version(foo)) is not the same as the string foo: str(Version("22.05")) == "22.5"
-    prev = None
-    for release in _get_release_version_strings(galaxy_root):
-        release_version = Version(release)
-        if release_version >= version:
-            return prev
-        prev = release_version
-    return prev
-
-
-def _get_release_version_strings(galaxy_root: Path) -> List[str]:
-    """Return sorted list of release version strings."""
-    all_files = _get_release_documentation_filenames(galaxy_root)
-    release_notes_file_pattern = re.compile(r"\d+\.\d+\.rst")
-    filenames = [f[:-4] for f in all_files if release_notes_file_pattern.match(f)]
-    return sorted(filenames)
-
-
-def _get_release_documentation_filenames(galaxy_root: Path) -> List[str]:
-    """Return contents of release documentation directory."""
-    releases_path = galaxy_root / "doc" / "source" / "releases"
-    if not os.path.exists(releases_path):
-        msg = f"Path to releases documentation not found: {releases_path}"
-        raise Exception(msg)
-    return sorted(os.listdir(releases_path))
-
-
 def _release_file(galaxy_root: Path, filename: Optional[str]) -> Path:
     """Construct and return path to a release documentation file."""
     filename = filename or OLDER_RELEASES_FILENAME

@@ -5,8 +5,6 @@ from github.PullRequest import PullRequest
 
 PROJECT_OWNER = "galaxyproject"
 PROJECT_NAME = "galaxy"
-PROJECT_URL = f"https://github.com/{PROJECT_OWNER}/{PROJECT_NAME}"
-PROJECT_API = f"https://api.github.com/repos/{PROJECT_OWNER}/{PROJECT_NAME}/"
 
 GROUPED_TAGS = dict(
     [
