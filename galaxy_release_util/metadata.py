@@ -20,8 +20,6 @@ GROUPED_TAGS = dict(
 
 
 def _pr_to_str(pr):
-    if isinstance(pr, str):
-        return pr
     return f"PR #{pr.number} ({pr.title}) {pr.html_url}"
 
 

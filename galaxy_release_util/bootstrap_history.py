@@ -684,6 +684,4 @@ def wrap(message: str, owner: str = PROJECT_OWNER, repo: str = PROJECT_NAME) -> 
 
 
 def _issue_to_str(issue: Issue) -> str:
-    if isinstance(issue, str):
-        return issue
     return f"Issue #{issue.number} ({issue.title}) {issue.html_url}"
