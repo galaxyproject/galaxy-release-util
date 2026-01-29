@@ -60,14 +60,13 @@ def test_create_changelog(
         config_content = (
             "current-version: '98.2'\n"
             "previous-version: '98.1'\n"
-            "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
             "freeze-date: '2099-01-01'\n"
         )
         config_path = Path("doc/source/releases/release_98.2.yml")
         config_path.write_text(config_content)
         result = runner.invoke(
-            create_changelog, ["98.2", "--galaxy-root", "."]
+            create_changelog, ["98.2", "--galaxy-root", ".", "--next-version", "99.0"]
         )  # version 98.2 to be released on January 15, 2099
         assert result.exit_code == 0, result.output
 
@@ -91,14 +90,13 @@ def test_create_changelog_dry_run(monkeypatch):
         config_content = (
             "current-version: '98.2'\n"
             "previous-version: '98.1'\n"
-            "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
             "freeze-date: '2099-01-01'\n"
         )
         config_path = Path("doc/source/releases/release_98.2.yml")
         config_path.write_text(config_content)
         result = runner.invoke(
-            create_changelog, ["98.2", "--galaxy-root", ".", "--dry-run"]
+            create_changelog, ["98.2", "--galaxy-root", ".", "--next-version", "99.0", "--dry-run"]
         )
         assert result.exit_code == 0, result.output
         assert "Dry run: skipping GitHub API call" in result.output
@@ -112,7 +110,6 @@ def test_check_blocking_prs_dry_run(monkeypatch):
         config_content = (
             "current-version: '98.2'\n"
             "previous-version: '98.1'\n"
-            "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
             "freeze-date: '2099-01-01'\n"
         )
@@ -133,7 +130,6 @@ def test_check_blocking_issues_dry_run(monkeypatch):
         config_content = (
             "current-version: '98.2'\n"
             "previous-version: '98.1'\n"
-            "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
             "freeze-date: '2099-01-01'\n"
         )
@@ -154,13 +150,12 @@ def test_create_release_issue_rejects_invalid_next_version(monkeypatch):
         config_content = (
             "current-version: '98.2'\n"
             "previous-version: '98.1'\n"
-            "next-version: '98.0'\n"
             "release-date: '2099-01-15'\n"
             "freeze-date: '2099-01-01'\n"
         )
         Path("doc/source/releases/release_98.2.yml").write_text(config_content)
         result = runner.invoke(
-            create_release_issue, ["98.2", "--galaxy-root", ".", "--dry-run"]
+            create_release_issue, ["98.2", "--galaxy-root", ".", "--next-version", "98.0", "--dry-run"]
         )
         assert result.exit_code != 0
         assert "Next release version should be greater than current version" in str(result.exception)
@@ -174,12 +169,11 @@ def test_create_release_issue_rejects_missing_freeze_date(monkeypatch):
         config_content = (
             "current-version: '98.2'\n"
             "previous-version: '98.1'\n"
-            "next-version: '99.0'\n"
             "release-date: '2099-01-15'\n"
         )
         Path("doc/source/releases/release_98.2.yml").write_text(config_content)
         result = runner.invoke(
-            create_release_issue, ["98.2", "--galaxy-root", ".", "--dry-run"]
+            create_release_issue, ["98.2", "--galaxy-root", ".", "--next-version", "99.0", "--dry-run"]
         )
         assert result.exit_code != 0
         assert "Missing required field" in str(result.exception)

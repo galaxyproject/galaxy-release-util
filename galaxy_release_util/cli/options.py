@@ -67,7 +67,7 @@ next_version_option = click.option(
     "--next-version",
     type=ClickVersion(),
     default=None,
-    help="Next planned release version. The first release of a year is YY.0; subsequent releases increment the minor version. Overrides config YAML.",
+    help="Next planned release version (required for create-release-issue and create-changelog). The first release of a year is YY.0; subsequent releases increment the minor version.",
 )
 
 release_date_option = click.option(

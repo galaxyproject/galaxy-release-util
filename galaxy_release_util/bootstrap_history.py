@@ -351,6 +351,8 @@ def create_release_issue(
         galaxy_root, release_version, release_config,
         previous_version, next_version, release_date, freeze_date,
     )
+    if config.next_version is None:
+        raise click.UsageError("--next-version is required for create-release-issue")
     assert config.next_version > config.current_version, "Next release version should be greater than current version"
 
     issue_template_params = dict(
@@ -408,6 +410,8 @@ def create_changelog(
         galaxy_root, release_version, release_config,
         previous_version, next_version, release_date, freeze_date,
     )
+    if config.next_version is None:
+        raise click.UsageError("--next-version is required for create-changelog")
     release_date = config.release_date
     next_version = config.next_version
 
@@ -449,7 +453,6 @@ def create_changelog(
     galaxy_root_option,
     release_config_option,
     previous_version_option,
-    next_version_option,
     release_date_option,
     freeze_date_option,
     dry_run_option,
@@ -459,7 +462,6 @@ def check_blocking_prs(
     galaxy_root: Path,
     release_config: Optional[Path],
     previous_version: Optional[Version],
-    next_version: Optional[Version],
     release_date: Optional[datetime.date],
     freeze_date: Optional[datetime.date],
     dry_run: bool,
@@ -467,7 +469,7 @@ def check_blocking_prs(
     verify_galaxy_root(galaxy_root)
     config = load_release_config(
         galaxy_root, release_version, release_config,
-        previous_version, next_version, release_date, freeze_date,
+        previous_version, None, release_date, freeze_date,
     )
     if dry_run:
         click.echo(f"Dry run: would check blocking PRs for milestone {release_version}")
@@ -485,7 +487,6 @@ def check_blocking_prs(
     galaxy_root_option,
     release_config_option,
     previous_version_option,
-    next_version_option,
     release_date_option,
     freeze_date_option,
     dry_run_option,
@@ -495,7 +496,6 @@ def check_blocking_issues(
     galaxy_root: Path,
     release_config: Optional[Path],
     previous_version: Optional[Version],
-    next_version: Optional[Version],
     release_date: Optional[datetime.date],
     freeze_date: Optional[datetime.date],
     dry_run: bool,
@@ -503,7 +503,7 @@ def check_blocking_issues(
     verify_galaxy_root(galaxy_root)
     config = load_release_config(
         galaxy_root, release_version, release_config,
-        previous_version, next_version, release_date, freeze_date,
+        previous_version, None, release_date, freeze_date,
     )
     if dry_run:
         click.echo(f"Dry run: would check blocking issues for milestone {release_version}")

@@ -11,9 +11,9 @@ from packaging.version import Version
 class ReleaseConfig:
     current_version: Version
     previous_version: Version
-    next_version: Version
     release_date: datetime.date
     freeze_date: datetime.date
+    next_version: Optional[Version] = None
     owner: str = "galaxyproject"
     repo: str = "galaxy"
 
@@ -53,8 +53,6 @@ def load_release_config(
     missing = []
     if previous_version is None:
         missing.append("--previous-version")
-    if next_version is None:
-        missing.append("--next-version")
     if release_date is None:
         missing.append("--release-date")
     if freeze_date is None:
@@ -67,9 +65,9 @@ def load_release_config(
     return ReleaseConfig(
         current_version=release_version,
         previous_version=previous_version,
-        next_version=next_version,
         release_date=release_date,
         freeze_date=freeze_date,
+        next_version=next_version,
     )
 
 
@@ -96,7 +94,7 @@ def _load_yaml_file(path: Path, release_version: Version) -> ReleaseConfig:
         data = yaml.safe_load(f)
     if not isinstance(data, dict):
         raise ValueError(f"Release config must be a YAML mapping, got {type(data).__name__} in {path}")
-    required_fields = ["current-version", "previous-version", "next-version", "freeze-date", "release-date"]
+    required_fields = ["current-version", "previous-version", "freeze-date", "release-date"]
     missing = [f for f in required_fields if f not in data]
     if missing:
         raise ValueError(
@@ -115,10 +113,14 @@ def _load_yaml_file(path: Path, release_version: Version) -> ReleaseConfig:
         raise ValueError(
             f"Invalid 'previous-version' value {data['previous-version']!r} in {path}: {e}"
         )
-    try:
-        next_version = Version(str(data["next-version"]))
-    except Exception as e:
-        raise ValueError(f"Invalid 'next-version' value {data['next-version']!r} in {path}: {e}")
+    next_version = None
+    if "next-version" in data:
+        if data["next-version"] is None:
+            raise ValueError(f"Field 'next-version' is present but has no value in {path}")
+        try:
+            next_version = Version(str(data["next-version"]))
+        except Exception as e:
+            raise ValueError(f"Invalid 'next-version' value {data['next-version']!r} in {path}: {e}")
     try:
         release_date = _parse_date(data["release-date"])
     except Exception as e:
@@ -137,9 +139,9 @@ def _load_yaml_file(path: Path, release_version: Version) -> ReleaseConfig:
     return ReleaseConfig(
         current_version=current_version,
         previous_version=previous_version,
-        next_version=next_version,
         release_date=release_date,
         freeze_date=freeze_date,
+        next_version=next_version,
         owner=owner,
         repo=repo,
     )

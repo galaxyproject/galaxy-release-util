@@ -130,12 +130,11 @@ cd <GALAXY_ROOT>
 ```yaml
 current-version: "<RELEASE_TAG>"
 previous-version: "<PREVIOUS_RELEASE_TAG>"
-next-version: "<NEXT_RELEASE_TAG>"
 freeze-date: "<FREEZE_DATE>"
 release-date: "<RELEASE_DATE>"
 ```
 
-All fields are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository.
+All fields are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository. The `next-version` value is provided via the `--next-version` CLI flag on commands that require it (e.g. `create-release-issue`, `create-changelog`).
 
 3. Commit this file to the repository so it is available for all subsequent release commands.
 
@@ -156,7 +155,7 @@ cd <GALAXY_ROOT>
 3. Review the generated release issue content:
 
 ```bash
-galaxy-release-util create-release-issue <RELEASE_TAG> --galaxy-root . --dry-run
+galaxy-release-util create-release-issue <RELEASE_TAG> --galaxy-root . --next-version <NEXT_RELEASE_TAG> --dry-run
 ```
 
 To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
