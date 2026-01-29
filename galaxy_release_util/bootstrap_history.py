@@ -351,7 +351,7 @@ def create_release_issue(
         galaxy_root, release_version, release_config,
         previous_version, next_version, release_date, freeze_date,
     )
-    assert config.next_version > release_version, "Next release version should be greater than release version"
+    assert config.next_version > config.current_version, "Next release version should be greater than current version"
 
     issue_template_params = dict(
         version=release_version,

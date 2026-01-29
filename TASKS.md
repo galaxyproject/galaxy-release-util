@@ -7,6 +7,8 @@ This document provides a step by step guide for managing Galaxy releases. It out
 * RELEASE_TAG: the release being prepared, for example 26.0
 * PREVIOUS_RELEASE_TAG: the last published release, for example 25.1
 * NEXT_RELEASE_TAG: the next planned release, for example 26.1
+* FREEZE_DATE: the date the release branch is frozen, for example 2026-01-27
+* RELEASE_DATE: the anticipated publication date, for example 2026-02-17
 
 ## Tasks
 
@@ -221,7 +223,7 @@ Send the following message:
 >
 > As of today, we are officially frozen for <RELEASE_TAG>. No new features or enhancements should be added to the <RELEASE_TAG> milestone after this point.
 > We still have <NUMBER_OF_OPEN_PRS> pull requests from the freeze list that must be merged before we can branch. Reviews are appreciated so we can proceed with branching.
-> Remaining PRs: [https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A)<RELEASE_TAG>
+> Remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A<RELEASE_TAG>
 
 ---
 
