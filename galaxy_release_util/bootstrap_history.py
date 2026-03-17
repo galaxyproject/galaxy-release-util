@@ -266,6 +266,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Update usegalaxy.org to ensure it is running the ``release_${version}`` branch.
     - [ ] Request that toolshed.g2.bx.psu.edu is updated to ``${version}``.
     - [ ] Conduct second stage of release testing on usegalaxy.org.
+        - [ ] Verify weekly, ideally before or during a developer's meeting, by checking the Slack admin channel and asking for any new release related issues.
+        - [ ] Verify that there have not been any new release related issues in sentry.galaxyproject.org.
     - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
     - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
         - [ ] https://github.com/galaxyproject/tools-iuc/blob/master/.github/workflows/
