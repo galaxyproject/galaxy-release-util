@@ -40,7 +40,10 @@ from .metadata import (
     strip_release,
 )
 from .release_config import load_release_config
-from .util import verify_galaxy_root
+from .util import (
+    escape_rst_inline,
+    verify_galaxy_root,
+)
 
 OLDER_RELEASES_FILENAME = "older_releases.rst"
 
@@ -632,7 +635,7 @@ def _pr_to_doc(
         _write_file(filename, content)
 
     def make_pr_to_doc() -> str:
-        to_doc = pr.title.rstrip(".") + " "
+        to_doc = escape_rst_inline(pr.title).rstrip(".") + " "
         to_doc += f"\n(thanks to `@{pr.user.login} <https://github.com/{pr.user.login}>`__)."
         to_doc += f"\n`Pull Request {pr.number}`_"
         return wrap(to_doc, owner, repo)

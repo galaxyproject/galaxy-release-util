@@ -1,5 +1,13 @@
 import os
+import re
 from pathlib import Path
+
+_RST_INLINE_MARKUP_RE = re.compile(r"([`*|\\])")
+
+
+def escape_rst_inline(text: str) -> str:
+    """Escape characters that have special meaning in RST inline markup."""
+    return _RST_INLINE_MARKUP_RE.sub(r"\\\1", text)
 
 
 def version_filepath(galaxy_root: Path) -> Path:

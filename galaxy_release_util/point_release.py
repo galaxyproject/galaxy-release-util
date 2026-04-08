@@ -39,6 +39,7 @@ from .metadata import (
     strip_release,
 )
 from .util import (
+    escape_rst_inline,
     verify_galaxy_root,
     version_filepath,
 )
@@ -337,8 +338,9 @@ def get_package_history(package: Package, new_version: Version) -> ChangelogItem
                     category = "Bug fixes"
                 if "enhancement" in text_target or "feature" in text_target:
                     category = "Enhancements"
+            title = escape_rst_inline(strip_release(pr.title))
             changes[category].append(
-                f"* {strip_release(pr.title)} by `@{pr.user.login} <https://github.com/{pr.user.login}>`_ in `#{pr.number} <{pr.html_url}>`_"
+                f"* {title} by `@{pr.user.login} <https://github.com/{pr.user.login}>`_ in `#{pr.number} <{pr.html_url}>`_"
             )
 
     for kind, entries in changes.items():
