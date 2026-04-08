@@ -858,8 +858,15 @@ def merge_changes_into_newer_branches(
 def push_references(galaxy_root: Path, release_tag: str, branches: List[str], upstream: str, no_confirm: bool) -> None:
     references = [release_tag] + branches
     if no_confirm or click.confirm(f"Push {','.join(references)} to upstream '{upstream}' ?", abort=True):
-        for reference in references:
-            subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
+        for i, reference in enumerate(references):
+            try:
+                subprocess.run(["git", "push", upstream, reference], cwd=galaxy_root).check_returncode()
+            except subprocess.CalledProcessError:
+                remaining = references[i:]
+                click.echo("\nPush failed. To complete the release, run the following commands manually:")
+                for ref in remaining:
+                    click.echo(f"  git push {upstream} {ref}")
+                raise
 
 
 if __name__ == "__main__":
