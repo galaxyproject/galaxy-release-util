@@ -45,7 +45,7 @@ from .util import (
 )
 
 REPO = get_repo_name(PROJECT_OWNER, PROJECT_NAME)
-DEFAULT_UPSTREAM_URL = f"https://github.com/{REPO}.git"
+DEFAULT_UPSTREAM_URL = f"git@github.com:{REPO}.git"
 
 HISTORY_TEMPLATE = """History
 -------
