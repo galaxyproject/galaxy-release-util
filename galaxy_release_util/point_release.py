@@ -848,10 +848,13 @@ def stage_changes_and_commit(
     subprocess.run(["git", "commit", "-m", commit_message], cwd=galaxy_root)
 
 
-def create_tag(galaxy_root: Path, release_tag: str, no_confirm: bool) -> None:
+def create_tag(galaxy_root: Path, release_tag: str, no_confirm: bool, message: Optional[str] = None) -> None:
     if not no_confirm:
         click.confirm(f"Create git tag '{release_tag}'?", abort=True)
-    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
+    if message:
+        subprocess.run(["git", "tag", "-a", "-m", message, release_tag], cwd=galaxy_root)
+    else:
+        subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
 
 
 def merge_changes_into_newer_branches(
