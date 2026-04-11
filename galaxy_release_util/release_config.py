@@ -147,6 +147,33 @@ def _load_yaml_file(path: Path, release_version: Version) -> ReleaseConfig:
     )
 
 
+def load_repo_owner(
+    galaxy_root: Path,
+    release_version: Version,
+    release_config_path: Optional[Path] = None,
+) -> tuple:
+    """Load owner and repo from release config YAML.
+
+    For point releases (e.g. 26.0.1), derives the major.minor version (26.0)
+    to locate the config file. Returns (owner, repo) tuple, falling back to
+    defaults only if no config file exists at the default path.
+    """
+    major_minor = Version(f"{release_version.major}.{release_version.minor}")
+    if release_config_path is not None:
+        if not release_config_path.exists():
+            raise FileNotFoundError(f"Release config not found: {release_config_path}")
+        path = release_config_path
+    else:
+        path = galaxy_root / "doc" / "source" / "releases" / f"release_{major_minor}.yml"
+        if not path.exists():
+            return ("galaxyproject", "galaxy")
+    with open(path) as f:
+        data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Release config must be a YAML mapping, got {type(data).__name__} in {path}")
+    return (data.get("owner", "galaxyproject"), data.get("repo", "galaxy"))
+
+
 def _parse_date(value) -> datetime.date:
     if isinstance(value, datetime.date):
         return value

@@ -29,6 +29,7 @@ from .cli.options import (
     ClickVersion,
     galaxy_root_option,
     group_options,
+    release_config_option,
 )
 from .github_client import github_client
 from .metadata import (
@@ -38,14 +39,12 @@ from .metadata import (
     get_repo_name,
     strip_release,
 )
+from .release_config import load_repo_owner
 from .util import (
     escape_rst_inline,
     verify_galaxy_root,
     version_filepath,
 )
-
-REPO = get_repo_name(PROJECT_OWNER, PROJECT_NAME)
-DEFAULT_UPSTREAM_URL = f"git@github.com:{REPO}.git"
 
 HISTORY_TEMPLATE = """History
 -------
@@ -230,10 +229,16 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
     Parser().parse(package.history_rst.read_text(), document)
     changelog_items: List[ChangelogItem] = []
     root_section = document[0]
-    assert isinstance(root_section, docutils.nodes.section)
+    if not isinstance(root_section, docutils.nodes.section):
+        raise ValueError(
+            f"Expected top-level section in {package.history_rst}, got {type(root_section).__name__}"
+        )
     for node in root_section.children:
         # ignore title and comment
-        assert isinstance(node, (docutils.nodes.title, docutils.nodes.comment, docutils.nodes.section)), node
+        if not isinstance(node, (docutils.nodes.title, docutils.nodes.comment, docutils.nodes.section)):
+            raise ValueError(
+                f"Unexpected node type {type(node).__name__} in {package.history_rst}: {node}"
+            )
         if isinstance(node, docutils.nodes.section):
             release_version = node[0].astext()
             current_date = None
@@ -262,9 +267,10 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
                         if isinstance(section_changelog_item, docutils.nodes.system_message):
                             # Likely a warning that subsection (e.g. Bug fixes) is not unique
                             continue
-                        assert isinstance(section_changelog_item, docutils.nodes.bullet_list), type(
-                            section_changelog_item
-                        )
+                        if not isinstance(section_changelog_item, docutils.nodes.bullet_list):
+                            raise ValueError(
+                                f"Expected bullet list in {package.history_rst}, got {type(section_changelog_item).__name__}"
+                            )
                         for child in section_changelog_item:
                             add_changelog_item(changes, child)
             changelog_items.append(ChangelogItem(version=current_version, date=current_date, changes=changes))
@@ -379,7 +385,11 @@ def upload_package(package: Package) -> None:
 def get_root_version(galaxy_root: Path) -> Version:
     version_py = version_filepath(galaxy_root)
     version_py_contents = version_py.read_text().splitlines()
-    assert len(version_py_contents) == 3
+    if len(version_py_contents) != 3:
+        raise ValueError(
+            f"Expected 3 lines in {version_py}, got {len(version_py_contents)}. "
+            "File should contain VERSION_MAJOR, VERSION_MINOR, and VERSION lines."
+        )
     major_version = version_py_contents[0].split('"')[1]
     minor_version = version_py_contents[1].split('"')[1]
     return Version(f"{major_version}.{minor_version}")
@@ -486,9 +496,12 @@ def merge_and_resolve_branches(
         last_changelog_item: Optional[ChangelogItem] = None
         for changelog_item in sorted(combined_history, key=lambda item: item.version, reverse=True):
             if last_changelog_item and changelog_item.version == last_changelog_item.version:
-                assert (
-                    last_changelog_item.changes == changelog_item.changes
-                ), f"Changelog differs for version {changelog_item.version} of package {new_package.name}, you have to fix this manually.\nOffending lines are {last_changelog_item.changes} and {changelog_item.changes}"
+                if last_changelog_item.changes != changelog_item.changes:
+                    raise ValueError(
+                        f"Changelog differs for version {changelog_item.version} of package {new_package.name}, "
+                        f"you have to fix this manually.\n"
+                        f"Offending lines are {last_changelog_item.changes} and {changelog_item.changes}"
+                    )
                 continue
             if not changelog_item.date and not changelog_item.changes:
                 # dev0 version, we'll inject that later
@@ -662,8 +675,8 @@ def build_and_upload(
 )
 @click.option("--build-packages/--no-build-packages", type=bool, is_flag=True, default=True)
 @click.option("--upload-packages", type=bool, is_flag=True, default=False)
-@click.option("--upstream", type=str, default=DEFAULT_UPSTREAM_URL)
-@group_options(packages_option, no_confirm_option)
+@click.option("--upstream", type=str, default=None, help="Git upstream URL. Default: git@github.com:{owner}/{repo}.git")
+@group_options(release_config_option, packages_option, no_confirm_option)
 def create_point_release(
     galaxy_root: Path,
     new_version: Version,
@@ -672,9 +685,13 @@ def create_point_release(
     package_subset: List[str],
     upload_packages: bool,
     no_confirm: bool,
-    upstream: str,
+    upstream: Optional[str],
+    release_config: Optional[Path],
 ):
     verify_galaxy_root(galaxy_root)
+    owner, repo = load_repo_owner(galaxy_root, new_version, release_config)
+    if upstream is None:
+        upstream = f"git@github.com:{get_repo_name(owner, repo)}.git"
     check_galaxy_repo_is_clean(galaxy_root)
     base_branch = get_current_branch(galaxy_root)
     user_confirmation(galaxy_root, new_version, base_branch, no_confirm)
@@ -687,7 +704,7 @@ def create_point_release(
     set_root_version(version_py, new_version)
     modified_paths = [version_py]
     packages = load_packages(galaxy_root, package_subset, last_commit)
-    commits_to_prs(packages)
+    commits_to_prs(packages, owner, repo)
     update_packages(packages, new_version, modified_paths)
     update_client_version(galaxy_root, new_version, modified_paths)
     run_build_packages(build_packages, packages)

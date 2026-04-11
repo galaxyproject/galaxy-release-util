@@ -641,7 +641,8 @@ def _get_prs(
     counter = 0
     click.echo("Collecting relevant pull requests...")
     for pr in repo.get_pulls(state=state, sort="updated", direction="desc"):
-        assert pr.updated_at
+        if pr.updated_at is None:
+            continue
         if pr.updated_at.replace(tzinfo=None) < cutoff_time:
             break
         counter += 1

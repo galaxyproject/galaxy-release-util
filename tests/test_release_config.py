@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from packaging.version import Version
 
-from galaxy_release_util.release_config import load_release_config
+from galaxy_release_util.release_config import load_release_config, load_repo_owner
 
 
 @pytest.fixture
@@ -188,3 +188,53 @@ def test_load_release_config_from_fixture():
     assert config.next_version is None
     assert config.freeze_date == datetime.date(2099, 1, 1)
     assert config.release_date == datetime.date(2099, 1, 15)
+
+
+def test_load_repo_owner_from_config(config_dir, tmp_path):
+    config_content = (
+        "current-version: '98.2'\n"
+        "previous-version: '98.1'\n"
+        "release-date: '2099-01-15'\n"
+        "freeze-date: '2099-01-01'\n"
+        "owner: 'myorg'\n"
+        "repo: 'mygalaxy'\n"
+    )
+    (config_dir / "release_98.2.yml").write_text(config_content)
+    owner, repo = load_repo_owner(tmp_path, Version("98.2"))
+    assert owner == "myorg"
+    assert repo == "mygalaxy"
+
+
+def test_load_repo_owner_point_release(config_dir, tmp_path):
+    """Point release version 98.2.1 should find config for 98.2."""
+    config_content = (
+        "current-version: '98.2'\n"
+        "previous-version: '98.1'\n"
+        "release-date: '2099-01-15'\n"
+        "freeze-date: '2099-01-01'\n"
+        "owner: 'myorg'\n"
+        "repo: 'mygalaxy'\n"
+    )
+    (config_dir / "release_98.2.yml").write_text(config_content)
+    owner, repo = load_repo_owner(tmp_path, Version("98.2.1"))
+    assert owner == "myorg"
+    assert repo == "mygalaxy"
+
+
+def test_load_repo_owner_defaults_when_no_config(tmp_path):
+    owner, repo = load_repo_owner(tmp_path, Version("99.0"))
+    assert owner == "galaxyproject"
+    assert repo == "galaxy"
+
+
+def test_load_repo_owner_defaults_when_no_owner_in_config(config_dir, tmp_path):
+    config_content = (
+        "current-version: '98.2'\n"
+        "previous-version: '98.1'\n"
+        "release-date: '2099-01-15'\n"
+        "freeze-date: '2099-01-01'\n"
+    )
+    (config_dir / "release_98.2.yml").write_text(config_content)
+    owner, repo = load_repo_owner(tmp_path, Version("98.2"))
+    assert owner == "galaxyproject"
+    assert repo == "galaxy"
