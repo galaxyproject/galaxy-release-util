@@ -441,11 +441,11 @@ def create_release_issue(
             body=issue_contents,
         )
         return release_issue
-    except GithubException:
-        log.exception(
-            "Failed to create an issue on GitHub. You need to be authenticated to use GitHub API."
-            "\nSee galaxy_release_util/github_client.py"
-        )
+    except GithubException as e:
+        raise click.ClickException(
+            f"Failed to create release issue on GitHub: {e}. "
+            "Ensure GITHUB_AUTH is set to a valid personal access token."
+        ) from e
 
 
 @cli.command(help="Create or update release changelog")

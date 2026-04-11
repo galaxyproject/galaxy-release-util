@@ -300,19 +300,24 @@ def commits_to_prs(packages: List[Package], owner: str = PROJECT_OWNER, repo_nam
     commit_to_pr = {}
     repo = g.get_repo(get_repo_name(owner, repo_name))
     total_commits = len(commits)
+    skipped = []
     for i, commit in enumerate(commits):
         click.echo(f"Processing commit {i + 1} of {total_commits}")
         # Get the list of pull requests associated with the commit
         commit_obj = repo.get_commit(commit)
         prs = commit_obj.get_pulls()
-        if not prs:
-            raise Exception(f"commit {commit} has no associated PRs")
+        if not prs or prs.totalCount == 0:
+            skipped.append(commit)
+            continue
         for pr in prs:
             if pr.number not in pr_cache:
                 pr_cache[pr.number] = pr
             commit_to_pr[commit] = pr_cache[pr.number]
+    if skipped:
+        click.echo(f"Warning: {len(skipped)} commit(s) have no associated PRs (e.g. merge commits):", err=True)
+        for sha in skipped:
+            click.echo(f"  {sha}", err=True)
     for package in packages:
-        # Exclude commits without PRs
         package.prs = set(commit_to_pr[commit] for commit in package.commits if commit in commit_to_pr)
 
 
