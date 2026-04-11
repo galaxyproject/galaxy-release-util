@@ -158,7 +158,7 @@ def test_create_release_issue_rejects_invalid_next_version(monkeypatch):
             create_release_issue, ["98.2", "--galaxy-root", ".", "--next-version", "98.0", "--dry-run"]
         )
         assert result.exit_code != 0
-        assert "Next release version should be greater than current version" in str(result.exception)
+        assert "--next-version (98.0) must be greater than release version (98.2)" in result.output
 
 
 def test_create_release_issue_rejects_missing_freeze_date(monkeypatch):

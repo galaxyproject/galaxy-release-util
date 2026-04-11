@@ -1,6 +1,5 @@
 import calendar
 import datetime
-import logging
 import os
 import re
 import string
@@ -381,9 +380,6 @@ dry_run_option = click.option(
     "--dry-run", is_flag=True, default=False, help="Do not connect to GitHub's API, print out output"
 )
 
-log = logging.getLogger(__name__)
-
-
 @click.group(help="Subcommands of this script can perform various tasks around creating Galaxy releases")
 def cli():
     pass
@@ -417,7 +413,8 @@ def create_release_issue(
     )
     if config.next_version is None:
         raise click.UsageError("--next-version is required for create-release-issue")
-    assert config.next_version > config.current_version, "Next release version should be greater than current version"
+    if config.next_version <= config.current_version:
+        raise click.UsageError(f"--next-version ({config.next_version}) must be greater than release version ({config.current_version})")
 
     issue_template_params = dict(
         version=release_version,
@@ -430,8 +427,8 @@ def create_release_issue(
     issue_title = f"Publication of Galaxy Release v {release_version}"
 
     if dry_run:
-        print(issue_title)
-        print(issue_contents)
+        click.echo(issue_title)
+        click.echo(issue_contents)
         return None
     try:
         github = github_client()
@@ -609,7 +606,7 @@ def _load_prs(
     n_prs = len(prs)
     for i, pr in enumerate(prs):
         if pr.number not in seen_prs:
-            print(f"Processing PR {i + 1} of {n_prs}")
+            click.echo(f"Processing PR {i + 1} of {n_prs}")
             _pr_to_doc(
                 galaxy_root=galaxy_root,
                 release_version=release_version,
@@ -618,7 +615,7 @@ def _load_prs(
                 repo=repo,
             )
         else:
-            print(f"Skipping PR {i + 1} of {n_prs} (previously processed)")
+            click.echo(f"Skipping PR {i + 1} of {n_prs} (previously processed)")
 
 
 def _get_prs(
@@ -642,14 +639,14 @@ def _get_prs(
 
     prs: List[PullRequest] = []
     counter = 0
-    print("Collecting relevant pull requests...")
+    click.echo("Collecting relevant pull requests...")
     for pr in repo.get_pulls(state=state, sort="updated", direction="desc"):
         assert pr.updated_at
         if pr.updated_at.replace(tzinfo=None) < cutoff_time:
             break
         counter += 1
         if counter % 100 == 0:
-            print(
+            click.echo(
                 f"Examined {counter} PRs; collected {len(prs)} (currently on #{pr.number} updated on {pr.updated_at.date()})"
             )
         # Select PRs that are merged + have correct milestone + have not been previously collected and added to the prs file
@@ -657,7 +654,7 @@ def _get_prs(
         if proper_state and pr.milestone and pr.milestone.title == str(release_version):
             prs.append(pr)
 
-    print(f"Collected {len(prs)} pull requests")
+    click.echo(f"Collected {len(prs)} pull requests")
     return prs
 
 

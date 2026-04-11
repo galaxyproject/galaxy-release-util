@@ -1,10 +1,7 @@
 import json
-import logging
 import os
 
 from github import Github
-
-log = logging.getLogger(__name__)
 
 
 def github_client() -> Github:
