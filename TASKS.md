@@ -1,6 +1,6 @@
 # Galaxy Release Manager Tasks
 
-This document provides a step by step guide for managing Galaxy releases. It outlines the responsibilities of the release manager from determining the freeze date to preparing and executing the release. Each step includes concrete actions, commands, and communication guidance to ensure a predictable and coordinated release process.
+This document provides a step by step guide for preparing a Galaxy release. It covers all steps up to and including the creation of the release publication issue. Once the issue is created, all subsequent steps are tracked as checkboxes in the issue itself, making it the single source of truth for the release process.
 
 ## Terminology
 
@@ -24,7 +24,7 @@ Two weeks before the planned freeze, announce the Freeze Meeting for the followi
 
 Send the following message:
 
-> 🗓️ Freeze Meeting on <FREEZE_MEETING_DATE>
+> Freeze Meeting on <FREEZE_MEETING_DATE>
 >
 > We will meet on <FREEZE_MEETING_DATE> for the Freeze Meeting, one week before the actual freeze. We will review open PRs, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges are completed by the freeze date. If you have outstanding PRs, please make sure they are set to ready for review before the meeting.
 
@@ -142,7 +142,7 @@ All fields are required. Two optional fields, `owner` and `repo`, default to `"g
 
 ### Step 7: Open New Release Publication Issue
 
-Using `galaxy-release-util`, create the release publication issue that tracks all publication tasks for the current release.
+Using `galaxy-release-util`, create the release publication issue that tracks all remaining release tasks.
 
 1. Ensure you are in the `galaxy-release-util` virtual environment.
 
@@ -162,223 +162,4 @@ To use a config file at a non-default location, add `--release-config /path/to/c
 
 4. Re run the command without `--dry-run` to open the issue on GitHub.
 
----
-
-### Step 8: Create Milestone for Next Release
-
-Create a milestone for the next release so new pull requests are tagged correctly.
-
-1. Go to [https://github.com/galaxyproject/galaxy/milestones](https://github.com/galaxyproject/galaxy/milestones)
-
-2. Click New milestone and create a milestone for <NEXT_RELEASE_TAG>
-
-3. Note the milestone number from the URL:
-
-```
-https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>
-```
-
-4. Edit [https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) and update `<MILESTONE_NUMBER>` so new pull requests are assigned to the correct milestone
-
-5. Open a pull request to apply the change
-
----
-
-### Step 9: Freeze Meeting
-
-One week before the freeze, hold the Freeze Meeting, usually during a weekly dev meeting. In this meeting, review open pull requests, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges complete before the freeze. Milestone decisions made here are binding for the freeze.
-
-To list pull requests for discussion:
-
-1. Go to [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls) and search for:
-
-```
-is:open is:pr milestone:<RELEASE_TAG> -label:kind/bug -is:draft
-```
-
----
-
-### Step 10: Final Pre Freeze Milestone and Label Audit
-
-Before freezing, ensure all pull requests in the milestone have appropriate `kind/*` labels and correct milestone assignment.
-
-1. Go to [https://github.com/galaxyproject/galaxy/pulls](https://github.com/galaxyproject/galaxy/pulls) and search for:
-
-```
-is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies
-```
-
-2. Assign appropriate labels and milestones to these pull requests
-
----
-
-### Step 11: Confirm and Announce Freeze
-
-After completing the audit, the release manager confirms the freeze and announces it.
-
-Send the following message:
-
-> 📌 We are now frozen for <RELEASE_TAG>
->
-> As of today, we are officially frozen for <RELEASE_TAG>. No new features or enhancements should be added to the <RELEASE_TAG> milestone after this point.
-> We still have <NUMBER_OF_OPEN_PRS> pull requests from the freeze list that must be merged before we can branch. Reviews are appreciated so we can proceed with branching.
-> Remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A<RELEASE_TAG>
-
----
-
-### Step 12: Review Merged Pull Requests
-
-Ensure all merged pull requests for the release are correctly labeled and titled to support accurate release notes.
-
-1. Identify merged pull requests missing a milestone:
-
-```
-is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PREVIOUS-RELEASE> -milestone:<RELEASE_TAG>
-```
-
-2. Assign the correct milestone to these pull requests
-
-3. Review titles of all pull requests in the milestone and adjust them conservatively to match Galaxy contribution guidelines
-
----
-
-### Step 13: Update Database Revision
-
-Update the database revision mapping for the release. This change must land before branching.
-
-1. Ensure `dev` is up to date:
-
-```bash
-git pull upstream dev
-```
-
-2. Run:
-
-```bash
-./manage_db.sh version
-```
-
-3. Note the revision identifier marked as head
-
-4. Add the mapping to `lib/galaxy/model/migrations/dbrevisions.py`:
-
-```
-"<RELEASE_TAG>": "<DB_REVISION>",
-```
-
-5. Open and merge a pull request with this change
-
----
-
-### Step 14: Merge Previous Release into dev
-
-Merge the previous release branch into `dev` to ensure all backported fixes are present.
-
-1. Check out and update the previous release:
-
-```bash
-git checkout release_<PREVIOUS_RELEASE_TAG>
-git pull upstream release_<PREVIOUS_RELEASE_TAG>
-```
-
-2. Merge into dev:
-
-```bash
-git checkout dev
-git merge release_<PREVIOUS_RELEASE_TAG>
-git commit -a -m "Merge <PREVIOUS_RELEASE_TAG> into dev"
-git push
-```
-
-3. Open and merge the resulting pull request
-
----
-
-### Step 15: Create Release Candidate Branches
-
-Create release candidate and next dev version branches.
-
-1. Update dev:
-
-```bash
-git checkout dev
-git pull upstream dev
-```
-
-2. Run:
-
-```bash
-source .venv/bin/activate
-make release-create-rc
-```
-
-This creates two branches:
-
-a. `version-<NEXT_RELEASE_TAG>.dev`
-
-* Title: Version <NEXT_RELEASE_TAG>.dev
-* Open a pull request against `dev`
-* Verify the future version number and remove any generated client hash build artifacts if present
-
-b. `version-<RELEASE_TAG>.rc1`
-
-* Title: Update version to <RELEASE_TAG>.rc1
-* Open a pull request against galaxyproject:release_<RELEASE_TAG>.
-* Example: https://github.com/galaxyproject/galaxy/pull/21019
-
-Note: These steps may silently fail without producing any branches. Inspect `cat packages/app/make-dist.log` if branches were not created.
-
----
-
-### Step 16: Create a new GitHub label
-
-* Navigate to https://github.com/galaxyproject/galaxy/issues
-* Click on `Labels` and `New label`
-* Create a new label: `release-testing-<RELEASE_TAG>`
-* Use this label to tag all release testing PRs
-
----
-
-### Step 17: Announce Branching
-
-Send the following message:
-
-> 🌱 Branched <RELEASE_TAG>
->
-> The <RELEASE_TAG> release branch has been created.
-
-Send this message to at least the following channels:
-
-* [https://matrix.to/#/#galaxyproject_ui-ux:gitter.im](https://matrix.to/#/#galaxyproject_ui-ux:gitter.im)
-* [https://matrix.to/#/#galaxyproject_backend:gitter.im](https://matrix.to/#/#galaxyproject_backend:gitter.im)
-
----
-
-### Step 18: Assemble Testing Team
-
-Reach out per email to assemble the testing team for the upcoming release:
-
->**Galaxy <RELEASE_TAG> Release Testing**
->
->Hi,
->
->I am organizing testing for the upcoming Galaxy release and would like to ask whether you would be available to participate.
->
->**Testing window:**
->**<DAY_NAME> <MONTH_NAME> <DAY_COUNT>** through **<DAY_NAME> <MONTH_NAME> <DAY_COUNT>**
->
->**Time commitment:**
->Approximately 1-2 hours per day. Testing consists of working through as many assigned PRs as time permits. There will be one short kick off meeting immediately before testing begins.
->
->**What release testing involves:**
->Release testing focuses on validating Galaxy GitHub pull requests. Each PR represents either a new feature, an enhancement, or a bug fix. Testing means exercising the changes as a user would and verifying that they behave correctly and do not introduce regressions. A curated list of PRs will be provided, and detailed guidance on the testing workflow and PR selection will be covered in the kick off meeting.
->
->I will be available throughout the testing period, and the galaxyproject/release-testing channel on Element will be used for coordination and questions.
->
->If you are able to participate, I will follow up with concrete details.
->
->Thanks!
-
----
-
-### Step 19: Continue with Release Issue
+All subsequent release steps are tracked as checkboxes in the publication issue.

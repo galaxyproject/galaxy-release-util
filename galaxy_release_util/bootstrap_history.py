@@ -195,13 +195,32 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Freeze Release (on or around ${freeze_date})**
 
     - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
-    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release.
-    - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests.
+    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release. Note the milestone number from the URL (`https://github.com/galaxyproject/galaxy/milestone/<NUMBER>`).
+    - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests. Open a pull request to apply the change.
+    - [ ] Hold the Freeze Meeting (one week before freeze, usually during a weekly dev meeting). Review [open milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3Akind%2Fbug+-is%3Adraft), decide what will be included in `${version}`, and assign reviewers to ensure merges complete before the freeze.
+    - [ ] Audit milestone labels. Ensure all open pull requests in the milestone have appropriate `kind/*` labels and correct milestone assignment. [Find unlabeled PRs](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A%22kind%2Ffeature%22+-label%3A%22kind%2Fbug%22+-label%3A%22kind%2Fenhancement%22+-label%3A%22kind%2Frefactoring%22+-label%3Adependencies).
     - [ ] Ensure all [freeze blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A"kind%2Fbug"+-is%3Adraft) have been merged, closed, or postponed until the next release.
+    - [ ] Announce the freeze on the following channels:
+        - [ ] https://matrix.to/#/#galaxyproject_ui-ux:gitter.im
+        - [ ] https://matrix.to/#/#galaxyproject_backend:gitter.im
+
+      Use the following message:
+
+      > As of today, we are officially frozen for ${version}. No new features or enhancements should be added to the ${version} milestone after this point. Reviews are appreciated so we can proceed with branching. Remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A${version}
+
+- [ ] **Review Merged Pull Requests**
+
+    - [ ] Identify merged pull requests [missing a milestone](https://github.com/galaxyproject/galaxy/pulls?utf8=%E2%9C%93&q=is%3Apr+is%3Amerged+no%3Amilestone+-label%3Amerge+sort%3Amerged+) merged since `release_${previous_version}` and assign the correct milestone.
+    - [ ] Review titles of all pull requests in the `${version}` milestone. Adjust them conservatively to match Galaxy contribution guidelines.
 
 - [ ] **Branch Release**
 
-    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``lib/galaxy/model/migrations/dbrevisions.py``.
+    - [ ] Add latest database revision identifier to ``REVISION_TAGS`` in ``lib/galaxy/model/migrations/dbrevisions.py``. To obtain the identifier, ensure `dev` is up to date and run:
+
+          git pull upstream dev
+          ./manage_db.sh version
+
+      Note the revision identifier marked as head. Add the mapping for ``${version}`` and open a pull request.
 
     - [ ] Merge the latest release into dev and push upstream.
 
@@ -212,7 +231,47 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           make release-create-rc
 
-    - [ ] Open pull requests from your fork of branch ``version-${version}.rc1`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
+      This creates two branches:
+
+        - ``version-${next_version}.dev``: Open a pull request against `dev`. Verify the future version number and remove any generated client hash build artifacts if present.
+        - ``version-${version}.rc1``: Open a pull request against `release_${version}`.
+
+      Note: These steps may silently fail without producing any branches. Inspect ``cat packages/app/make-dist.log`` if branches were not created.
+
+    - [ ] Create a new GitHub label `release-testing-${version}` at https://github.com/galaxyproject/galaxy/labels to tag all release testing PRs.
+
+    - [ ] Announce branching on the following channels:
+        - [ ] https://matrix.to/#/#galaxyproject_ui-ux:gitter.im
+        - [ ] https://matrix.to/#/#galaxyproject_backend:gitter.im
+
+      Use the following message:
+
+      > The ${version} release branch has been created.
+
+- [ ] **Assemble Testing Team**
+
+    - [ ] Reach out per email to assemble the testing team for `${version}`. Use the following template:
+
+      > **Galaxy ${version} Release Testing**
+      >
+      > Hi,
+      >
+      > I am organizing testing for the upcoming Galaxy release and would like to ask whether you would be available to participate.
+      >
+      > **Testing window:**
+      > <START_DATE> through <END_DATE>
+      >
+      > **Time commitment:**
+      > Approximately 1-2 hours per day. Testing consists of working through as many assigned PRs as time permits. There will be one short kick off meeting immediately before testing begins.
+      >
+      > **What release testing involves:**
+      > Release testing focuses on validating Galaxy GitHub pull requests. Each PR represents either a new feature, an enhancement, or a bug fix. Testing means exercising the changes as a user would and verifying that they behave correctly and do not introduce regressions. A curated list of PRs will be provided, and detailed guidance on the testing workflow and PR selection will be covered in the kick off meeting.
+      >
+      > I will be available throughout the testing period, and the galaxyproject/release-testing channel on Element will be used for coordination and questions.
+      >
+      > If you are able to participate, I will follow up with concrete details.
+      >
+      > Thanks!
 
 - [ ] **Run tool and workflow tests:**
 
