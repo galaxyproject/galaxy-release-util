@@ -19,6 +19,7 @@ from .metadata import get_repo_name
 from .point_release import (
     ChangelogItem,
     Package,
+    build_package,
     bump_package_version,
     commits_to_prs,
     create_tag,
@@ -203,14 +204,19 @@ def create_release_snapshot(
 
     update_client_version(galaxy_root, snapshot_version, modified_paths)
 
-    # 12. Commit
+    # 12. Build packages (validation only — artifacts are discarded)
+    #     This runs before commit/tag so packaging failures abort the snapshot
+    #     without leaving any trace in git history.
+    _build_packages_or_abort(packages)
+
+    # 13. Commit
     commit_message = f"Snapshot release {snapshot_version}\n\n{SNAPSHOT_TAG_MESSAGE}"
     stage_changes_and_commit(galaxy_root, snapshot_version, modified_paths, commit_message, no_confirm=True)
 
-    # 13. Annotated tag
+    # 14. Annotated tag
     create_tag(galaxy_root, snapshot_tag, no_confirm=True, message=SNAPSHOT_TAG_MESSAGE)
 
-    # 14. Push tag only
+    # 15. Push tag only
     click.echo(f"Pushing {snapshot_tag} to {push_remote}")
     try:
         subprocess.run(
@@ -221,6 +227,24 @@ def create_release_snapshot(
         raise
 
     click.echo(f"Snapshot release {snapshot_version} created and pushed as {snapshot_tag}")
+
+
+def _build_packages_or_abort(packages: List[Package]) -> None:
+    """Build each package to validate the packaging path.
+
+    Builds are validation-only — artifacts are not uploaded or used.
+    If any package fails to build, abort before any commit or tag is created
+    so the snapshot does not produce a misleading release artifact.
+    """
+    click.echo(f"Building {len(packages)} package(s) to validate packaging path")
+    for package in packages:
+        try:
+            build_package(package)
+        except subprocess.CalledProcessError as e:
+            raise click.ClickException(
+                f"Package '{package.name}' failed to build: {e}. "
+                "Aborting snapshot — no commit or tag has been created."
+            ) from e
 
 
 def _load_packages_without_baseline(galaxy_root: Path) -> List[Package]:
