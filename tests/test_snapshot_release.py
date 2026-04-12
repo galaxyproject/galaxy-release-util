@@ -7,55 +7,62 @@ from galaxy_release_util.snapshot_release import (
     CANONICAL_OWNER,
     CANONICAL_REPO,
     SNAPSHOT_TAG_PREFIX,
+    _url_points_to_canonical,
     find_canonical_upstream,
     find_last_snapshot_tag,
 )
 
 
 class TestFindCanonicalUpstream:
-    def _mock_remotes(self, output):
-        return patch(
-            "galaxy_release_util.snapshot_release.subprocess.run",
-            return_value=MagicMock(
-                stdout=output, returncode=0, check_returncode=lambda: None,
-            ),
-        )
+    """find_canonical_upstream enumerates remote names via `git remote` and then
+    calls `git remote get-url <name>` for each. These tests simulate that sequence.
+    """
+
+    def _mock_sequence(self, remote_map):
+        """Create a fake subprocess.run that handles `git remote` and `git remote get-url <name>`.
+
+        remote_map: dict of {remote_name: fetch_url}
+        """
+        def fake_run(cmd, **kwargs):
+            if cmd == ["git", "remote"]:
+                output = "\n".join(remote_map.keys()) + "\n" if remote_map else ""
+                return MagicMock(stdout=output, returncode=0, check_returncode=lambda: None)
+            if len(cmd) >= 4 and cmd[0] == "git" and cmd[1] == "remote" and cmd[2] == "get-url":
+                # Could be ["git", "remote", "get-url", name] or ["git", "remote", "get-url", "--push", name]
+                name = cmd[-1]
+                if name in remote_map:
+                    return MagicMock(stdout=remote_map[name] + "\n", returncode=0)
+                return MagicMock(stdout="", returncode=1, stderr="no such remote")
+            return MagicMock(stdout="", returncode=0, check_returncode=lambda: None)
+
+        return patch("galaxy_release_util.snapshot_release.subprocess.run", side_effect=fake_run)
 
     def test_ssh_remote(self):
-        remotes = "origin\tgit@github.com:guerler/galaxy.git (fetch)\nupstream\tgit@github.com:galaxyproject/galaxy.git (fetch)\n"
-        with self._mock_remotes(remotes):
+        with self._mock_sequence({
+            "origin": "git@github.com:guerler/galaxy.git",
+            "upstream": "git@github.com:galaxyproject/galaxy.git",
+        }):
             assert find_canonical_upstream(Path("/fake")) == "git@github.com:galaxyproject/galaxy.git"
 
     def test_https_remote(self):
-        remotes = "upstream\thttps://github.com/galaxyproject/galaxy.git (fetch)\n"
-        with self._mock_remotes(remotes):
+        with self._mock_sequence({"upstream": "https://github.com/galaxyproject/galaxy.git"}):
             assert find_canonical_upstream(Path("/fake")) == "https://github.com/galaxyproject/galaxy.git"
 
     def test_https_no_git_suffix(self):
-        remotes = "upstream\thttps://github.com/galaxyproject/galaxy (fetch)\n"
-        with self._mock_remotes(remotes):
+        with self._mock_sequence({"upstream": "https://github.com/galaxyproject/galaxy"}):
             assert find_canonical_upstream(Path("/fake")) == "https://github.com/galaxyproject/galaxy"
 
     def test_case_insensitive(self):
-        remotes = "upstream\thttps://github.com/GalaxyProject/Galaxy.git (fetch)\n"
-        with self._mock_remotes(remotes):
+        with self._mock_sequence({"upstream": "https://github.com/GalaxyProject/Galaxy.git"}):
             assert find_canonical_upstream(Path("/fake")) == "https://github.com/GalaxyProject/Galaxy.git"
 
     def test_no_match_returns_fallback(self):
-        remotes = "origin\tgit@github.com:guerler/galaxy.git (fetch)\n"
-        with self._mock_remotes(remotes):
-            url = find_canonical_upstream(Path("/fake"))
-            assert url == "https://github.com/galaxyproject/galaxy.git"
+        with self._mock_sequence({"origin": "git@github.com:guerler/galaxy.git"}):
+            assert find_canonical_upstream(Path("/fake")) == "https://github.com/galaxyproject/galaxy.git"
 
-    def test_ignores_push_lines(self):
-        remotes = (
-            "upstream\tgit@github.com:guerler/galaxy.git (fetch)\n"
-            "upstream\tgit@github.com:galaxyproject/galaxy.git (push)\n"
-        )
-        with self._mock_remotes(remotes):
-            # Should not match the push line, should fall back
-            url = find_canonical_upstream(Path("/fake"))
-            assert url == "https://github.com/galaxyproject/galaxy.git"
+    def test_no_remotes_returns_fallback(self):
+        with self._mock_sequence({}):
+            assert find_canonical_upstream(Path("/fake")) == "https://github.com/galaxyproject/galaxy.git"
 
 
 class TestFindLastSnapshotTag:
@@ -89,6 +96,35 @@ class TestFindLastSnapshotTag:
             assert f"{SNAPSHOT_TAG_PREFIX}25.1.*" in call_args
             assert "--merged" in call_args
             assert "HEAD" in call_args
+
+
+class TestUrlPointsToCanonical:
+    def test_ssh_canonical(self):
+        assert _url_points_to_canonical("git@github.com:galaxyproject/galaxy.git")
+
+    def test_ssh_canonical_no_suffix(self):
+        assert _url_points_to_canonical("git@github.com:galaxyproject/galaxy")
+
+    def test_https_canonical(self):
+        assert _url_points_to_canonical("https://github.com/galaxyproject/galaxy.git")
+
+    def test_https_canonical_no_suffix(self):
+        assert _url_points_to_canonical("https://github.com/galaxyproject/galaxy")
+
+    def test_https_canonical_trailing_slash(self):
+        assert _url_points_to_canonical("https://github.com/galaxyproject/galaxy/")
+
+    def test_case_insensitive(self):
+        assert _url_points_to_canonical("git@github.com:GalaxyProject/Galaxy.git")
+
+    def test_fork_not_canonical(self):
+        assert not _url_points_to_canonical("git@github.com:guerler/galaxy.git")
+
+    def test_different_repo_not_canonical(self):
+        assert not _url_points_to_canonical("git@github.com:galaxyproject/galaxy-hub.git")
+
+    def test_unrelated_url_not_canonical(self):
+        assert not _url_points_to_canonical("https://example.com/something/else.git")
 
 
 class TestVersionComputation:
@@ -190,6 +226,138 @@ class TestSafetyChecks:
         result = runner.invoke(cli, ["create-release-snapshot", "--galaxy-root", str(tmp_path)])
         assert result.exit_code != 0
         assert "already exists locally" in result.output
+
+    def test_refuse_push_remote_pointing_to_canonical(self, monkeypatch, tmp_path):
+        """Explicit --push-remote pointing at canonical galaxyproject/galaxy must be refused."""
+        from click.testing import CliRunner
+        from galaxy_release_util.snapshot_release import cli
+
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.verify_galaxy_root", lambda x: None)
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.is_git_clean", lambda x: True)
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.get_current_branch", lambda x: "dev")
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release.get_root_version",
+            lambda x: Version("25.1.2"),
+        )
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release.load_repo_owner",
+            lambda *a, **kw: ("myuser", "mygalaxy"),
+        )
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release._tag_exists_locally",
+            lambda gx, tag: False,
+        )
+        # Simulate the override path: user explicitly points --push-remote at canonical
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "create-release-snapshot",
+            "--galaxy-root", str(tmp_path),
+            "--push-remote", "git@github.com:galaxyproject/galaxy.git",
+        ])
+        assert result.exit_code != 0
+        assert "resolves to the canonical" in result.output
+        assert "galaxyproject/galaxy" in result.output
+
+    def test_refuse_push_remote_name_resolving_to_canonical(self, monkeypatch, tmp_path):
+        """--push-remote using a remote name that resolves to canonical must be refused."""
+        from click.testing import CliRunner
+        from galaxy_release_util.snapshot_release import cli
+
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.verify_galaxy_root", lambda x: None)
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.is_git_clean", lambda x: True)
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.get_current_branch", lambda x: "dev")
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release.get_root_version",
+            lambda x: Version("25.1.2"),
+        )
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release.load_repo_owner",
+            lambda *a, **kw: ("myuser", "mygalaxy"),
+        )
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release._tag_exists_locally",
+            lambda gx, tag: False,
+        )
+        # Simulate `git remote get-url upstream` resolving to canonical
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release._resolve_push_remote_url",
+            lambda gx, name: "git@github.com:galaxyproject/galaxy.git",
+        )
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "create-release-snapshot",
+            "--galaxy-root", str(tmp_path),
+            "--push-remote", "upstream",
+        ])
+        assert result.exit_code != 0
+        assert "resolves to the canonical" in result.output
+
+    def test_refuse_push_remote_with_divergent_pushurl(self, monkeypatch, tmp_path):
+        """A remote whose fetch URL is safe but pushurl points to canonical must be refused.
+
+        This is the dangerous divergence case: `git remote get-url <remote>` (without --push)
+        would return the safe fetch URL, but `git push <remote>` would dispatch to the
+        canonical push URL. The safety check must use the push URL.
+        """
+        from click.testing import CliRunner
+        from galaxy_release_util.snapshot_release import cli
+
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.verify_galaxy_root", lambda x: None)
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.is_git_clean", lambda x: True)
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.get_current_branch", lambda x: "dev")
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release.get_root_version",
+            lambda x: Version("25.1.2"),
+        )
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release.load_repo_owner",
+            lambda *a, **kw: ("myuser", "mygalaxy"),
+        )
+        monkeypatch.setattr(
+            "galaxy_release_util.snapshot_release._tag_exists_locally",
+            lambda gx, tag: False,
+        )
+
+        # Simulate subprocess: `git remote get-url --push origin` returns canonical URL.
+        # This is what a remote with `pushurl = git@github.com:galaxyproject/galaxy.git` would produce.
+        def fake_run(cmd, **kwargs):
+            if cmd[:4] == ["git", "remote", "get-url", "--push"]:
+                return MagicMock(
+                    returncode=0,
+                    stdout="git@github.com:galaxyproject/galaxy.git\n",
+                    stderr="",
+                )
+            return MagicMock(returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.subprocess.run", fake_run)
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [
+            "create-release-snapshot",
+            "--galaxy-root", str(tmp_path),
+            "--push-remote", "origin",
+        ])
+        assert result.exit_code != 0
+        assert "resolves to the canonical" in result.output
+
+    def test_resolver_uses_push_url_flag(self, monkeypatch, tmp_path):
+        """Verify the resolver calls `git remote get-url --push`, not the bare form.
+
+        This is a regression test for the fetch-vs-push URL safety bug.
+        """
+        from galaxy_release_util.snapshot_release import _resolve_push_remote_url
+
+        captured_cmds = []
+
+        def fake_run(cmd, **kwargs):
+            captured_cmds.append(cmd)
+            return MagicMock(returncode=0, stdout="git@github.com:guerler/galaxy.git\n")
+
+        monkeypatch.setattr("galaxy_release_util.snapshot_release.subprocess.run", fake_run)
+        _resolve_push_remote_url(tmp_path, "origin")
+
+        assert len(captured_cmds) == 1
+        assert captured_cmds[0] == ["git", "remote", "get-url", "--push", "origin"]
 
     def test_refuse_duplicate_remote_tag(self, monkeypatch, tmp_path):
         from click.testing import CliRunner

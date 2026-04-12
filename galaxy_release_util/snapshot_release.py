@@ -1,5 +1,4 @@
 import datetime
-import re
 import subprocess
 from pathlib import Path
 from typing import (
@@ -44,22 +43,33 @@ CANONICAL_HTTPS = f"https://github.com/{CANONICAL_OWNER}/{CANONICAL_REPO}.git"
 
 SNAPSHOT_TAG_PREFIX = "snapshot-v"
 SNAPSHOT_TAG_MESSAGE = "Validation snapshot for release process exercise on fork, derived from galaxyproject/galaxy dev"
-INITIAL_SNAPSHOT_TEXT = "Initial snapshot — no prior baseline"
+INITIAL_SNAPSHOT_TEXT = "Initial snapshot - no prior baseline"
 
 
 def find_canonical_upstream(galaxy_root: Path) -> str:
-    """Find the canonical galaxyproject/galaxy remote URL from local git remotes."""
+    """Find the canonical galaxyproject/galaxy remote fetch URL from local git remotes.
+
+    Enumerates configured remotes by name and checks each remote's fetch URL
+    against the canonical identity. Returns the first match, or the HTTPS
+    fallback if no remote points to canonical.
+    """
     result = subprocess.run(
-        ["git", "remote", "-v"], cwd=galaxy_root, capture_output=True, text=True,
+        ["git", "remote"], cwd=galaxy_root, capture_output=True, text=True,
     )
     result.check_returncode()
-    canonical_pattern = re.compile(r"galaxyproject[/:]galaxy(?:\.git)?(?:\s|$)", re.IGNORECASE)
-    for line in result.stdout.splitlines():
-        parts = line.split()
-        if len(parts) >= 2 and "(fetch)" in line:
-            url = parts[1]
-            if canonical_pattern.search(url):
-                return url
+    for remote_name in result.stdout.splitlines():
+        remote_name = remote_name.strip()
+        if not remote_name:
+            continue
+        fetch_url_result = subprocess.run(
+            ["git", "remote", "get-url", remote_name],
+            cwd=galaxy_root, capture_output=True, text=True,
+        )
+        if fetch_url_result.returncode != 0:
+            continue
+        fetch_url = fetch_url_result.stdout.strip()
+        if _url_points_to_canonical(fetch_url):
+            return fetch_url
     return CANONICAL_HTTPS
 
 
@@ -73,6 +83,44 @@ def find_last_snapshot_tag(galaxy_root: Path, major_minor: str) -> Optional[str]
     result.check_returncode()
     tags = result.stdout.strip().splitlines()
     return tags[0] if tags else None
+
+
+def _resolve_push_remote_url(galaxy_root: Path, push_remote: str) -> str:
+    """Resolve push_remote to the concrete URL that `git push` would actually target.
+
+    If push_remote is a local git remote name (e.g. 'origin', 'upstream'),
+    returns the remote's push URL, which may differ from its fetch URL when
+    a separate pushurl is configured. Otherwise, assumes push_remote is already
+    a URL and returns it unchanged.
+
+    Using the push URL (not the fetch URL) is a safety requirement: we must
+    validate the same target that `git push` will use.
+    """
+    result = subprocess.run(
+        ["git", "remote", "get-url", "--push", push_remote],
+        cwd=galaxy_root, capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        return result.stdout.strip()
+    # Not a known remote name - assume it's already a URL
+    return push_remote
+
+
+def _url_points_to_canonical(url: str) -> bool:
+    """Check whether a git URL resolves to the canonical galaxyproject/galaxy repo.
+
+    Handles SSH (git@github.com:galaxyproject/galaxy[.git]),
+    HTTPS (https://github.com/galaxyproject/galaxy[.git]),
+    case variations, and trailing slashes.
+    """
+    normalized = url.strip().lower().rstrip("/")
+    if normalized.endswith(".git"):
+        normalized = normalized[:-4]
+    # Match both SSH and HTTPS forms ending in galaxyproject/galaxy
+    return (
+        normalized.endswith(f"/{CANONICAL_OWNER}/{CANONICAL_REPO}")
+        or normalized.endswith(f":{CANONICAL_OWNER}/{CANONICAL_REPO}")
+    )
 
 
 def _tag_exists_locally(galaxy_root: Path, tag: str) -> bool:
@@ -167,14 +215,28 @@ def create_release_snapshot(
     if _tag_exists_locally(galaxy_root, snapshot_tag):
         raise click.ClickException(f"Tag '{snapshot_tag}' already exists locally. A snapshot was already created today.")
 
-    # 7. Compute push remote and refuse if tag already exists on remote
+    # 7. Compute push remote
     if push_remote is None:
         push_remote = f"git@github.com:{get_repo_name(owner, repo)}.git"
 
-    click.echo(f"Snapshot: {snapshot_version} -> {push_remote}")
+    # Resolve to a concrete URL (handle remote names like 'origin', 'upstream')
+    # and hard-refuse if it points to canonical galaxyproject/galaxy.
+    # This is the enforced safety boundary: no push operation can target canonical.
+    resolved_push_url = _resolve_push_remote_url(galaxy_root, push_remote)
+    if _url_points_to_canonical(resolved_push_url):
+        raise click.ClickException(
+            f"Push target '{push_remote}' resolves to the canonical "
+            f"galaxyproject/galaxy repository ({resolved_push_url}). "
+            "Snapshot releases must never push to the canonical repository. "
+            "Specify a fork via --push-remote or the release config YAML."
+        )
 
-    if _tag_exists_on_remote(galaxy_root, push_remote, snapshot_tag):
-        raise click.ClickException(f"Tag '{snapshot_tag}' already exists on remote {push_remote}.")
+    click.echo(f"Snapshot: {snapshot_version} -> {resolved_push_url}")
+
+    # From this point on, use resolved_push_url everywhere, never the original token.
+    # This guarantees the validated target and the actual push target are the same URL.
+    if _tag_exists_on_remote(galaxy_root, resolved_push_url, snapshot_tag):
+        raise click.ClickException(f"Tag '{snapshot_tag}' already exists on remote {resolved_push_url}.")
 
     # 8. Verify HEAD matches canonical upstream dev
     canonical_url = find_canonical_upstream(galaxy_root)
@@ -204,7 +266,7 @@ def create_release_snapshot(
 
     update_client_version(galaxy_root, snapshot_version, modified_paths)
 
-    # 12. Build packages (validation only — artifacts are discarded)
+    # 12. Build packages (validation only, artifacts are discarded)
     #     This runs before commit/tag so packaging failures abort the snapshot
     #     without leaving any trace in git history.
     _build_packages_or_abort(packages)
@@ -216,14 +278,16 @@ def create_release_snapshot(
     # 14. Annotated tag
     create_tag(galaxy_root, snapshot_tag, no_confirm=True, message=SNAPSHOT_TAG_MESSAGE)
 
-    # 15. Push tag only
-    click.echo(f"Pushing {snapshot_tag} to {push_remote}")
+    # 15. Push tag only, using the resolved URL rather than the original token.
+    #     This prevents git from dispatching to a different target than the
+    #     one that was safety-validated.
+    click.echo(f"Pushing {snapshot_tag} to {resolved_push_url}")
     try:
         subprocess.run(
-            ["git", "push", push_remote, snapshot_tag], cwd=galaxy_root,
+            ["git", "push", resolved_push_url, snapshot_tag], cwd=galaxy_root,
         ).check_returncode()
     except subprocess.CalledProcessError:
-        click.echo(f"\nPush failed. To complete manually:\n  git push {push_remote} {snapshot_tag}")
+        click.echo(f"\nPush failed. To complete manually:\n  git push {resolved_push_url} {snapshot_tag}")
         raise
 
     click.echo(f"Snapshot release {snapshot_version} created and pushed as {snapshot_tag}")
@@ -232,7 +296,7 @@ def create_release_snapshot(
 def _build_packages_or_abort(packages: List[Package]) -> None:
     """Build each package to validate the packaging path.
 
-    Builds are validation-only — artifacts are not uploaded or used.
+    Builds are validation-only: artifacts are not uploaded or used.
     If any package fails to build, abort before any commit or tag is created
     so the snapshot does not produce a misleading release artifact.
     """
@@ -243,7 +307,7 @@ def _build_packages_or_abort(packages: List[Package]) -> None:
         except subprocess.CalledProcessError as e:
             raise click.ClickException(
                 f"Package '{package.name}' failed to build: {e}. "
-                "Aborting snapshot — no commit or tag has been created."
+                "Aborting snapshot: no commit or tag has been created."
             ) from e
 
 
