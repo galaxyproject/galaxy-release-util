@@ -5,33 +5,37 @@
 
 .. include:: _header.rst
 
-Please see the full :doc:`98.2 release notes <98.2_announce>` for more details.
+Please see the full `release notes <https://github.com/galaxyproject/galaxy/releases/tag/v98.2.0>`__ for more details.
 
 Highlights
 ===========================================================
 
+Discover some of the exciting new features, enhancements, and improvements in Galaxy 98.2.
+
 Feature1
 --------
 
-Feature description.
+A description of the feature and its main highlights. Include screenshots/videos if applicable.
 
 Feature2
 --------
 
-Feature description.
+A description of the feature and its main highlights. Include screenshots/videos if applicable.
 
 Feature3
 --------
 
-Feature description.
+A description of the feature and its main highlights. Include screenshots/videos if applicable.
 
 
-Visualizations
+----
+
+Visualizations Updates
 ===========================================================
 
 .. visualizations
 
-Datatypes
+Datatypes Updates
 ===========================================================
 
 .. datatypes
@@ -41,7 +45,8 @@ Builtin Tool Updates
 
 .. tools
 
-Please see the full :doc:`98.2 release notes <98.2_announce>` for more details.
+Please see the full `release notes <https://github.com/galaxyproject/galaxy/releases/tag/v98.2.0>`__ for more details.
+The admin-facing release notes are available :doc:`here <98.2_announce>`.
 
 .. include:: 98.2_prs.rst
 

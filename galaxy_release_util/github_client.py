@@ -16,10 +16,19 @@ def github_client() -> Github:
     auth = os.environ.get("GITHUB_AUTH")
     if auth is not None:
         return Github(auth)
-    else:
-        github_json_path = os.path.expanduser("~/.github.json")
-        if not os.path.exists(github_json_path):
-            return Github(None)
+    github_json_path = os.path.expanduser("~/.github.json")
+    if not os.path.exists(github_json_path):
+        raise RuntimeError(
+            "GitHub authentication required but not configured. "
+            "Set the GITHUB_AUTH environment variable to a personal access token, "
+            "or create ~/.github.json with a 'login_or_token' key. "
+            "See https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token"
+        )
+    try:
         with open(github_json_path) as fh:
             github_json_dict = json.load(fh)
-        return Github(**github_json_dict)
+    except (json.JSONDecodeError, OSError) as e:
+        raise RuntimeError(f"Failed to read GitHub config from {github_json_path}: {e}") from e
+    if not isinstance(github_json_dict, dict):
+        raise RuntimeError(f"Expected a JSON object in {github_json_path}, got {type(github_json_dict).__name__}")
+    return Github(**github_json_dict)

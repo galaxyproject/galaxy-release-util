@@ -1,6 +1,5 @@
 import calendar
 import datetime
-import logging
 import os
 import re
 import string
@@ -20,22 +19,30 @@ from github.PullRequest import PullRequest
 from packaging.version import Version
 
 from .cli.options import (
-    ClickDate,
     ClickVersion,
+    freeze_date_option,
     galaxy_root_option,
     group_options,
+    next_version_option,
+    previous_version_option,
+    release_config_option,
+    release_date_option,
 )
 from .github_client import github_client
 from .metadata import (
-    _pr_to_labels,
-    _pr_to_str,
-    _text_target,
     PROJECT_NAME,
     PROJECT_OWNER,
-    PROJECT_URL,
+    _pr_to_labels,
+    _pr_to_str,
+    get_project_url,
+    get_repo_name,
     strip_release,
 )
-from .util import verify_galaxy_root
+from .release_config import load_release_config
+from .util import (
+    escape_rst_inline,
+    verify_galaxy_root,
+)
 
 OLDER_RELEASES_FILENAME = "older_releases.rst"
 
@@ -187,13 +194,32 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Freeze Release (on or around ${freeze_date})**
 
     - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
-    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release.
-    - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests.
+    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release. Note the milestone number from the URL (`https://github.com/galaxyproject/galaxy/milestone/<NUMBER>`).
+    - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests. Open a pull request to apply the change.
+    - [ ] Hold the Freeze Meeting (one week before freeze, usually during a weekly dev meeting). Review [open milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3Akind%2Fbug+-is%3Adraft), decide what will be included in `${version}`, and assign reviewers to ensure merges complete before the freeze.
+    - [ ] Audit milestone labels. Ensure all open pull requests in the milestone have appropriate `kind/*` labels and correct milestone assignment. [Find unlabeled PRs](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A%22kind%2Ffeature%22+-label%3A%22kind%2Fbug%22+-label%3A%22kind%2Fenhancement%22+-label%3A%22kind%2Frefactoring%22+-label%3Adependencies).
     - [ ] Ensure all [freeze blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A"kind%2Fbug"+-is%3Adraft) have been merged, closed, or postponed until the next release.
+    - [ ] Announce the freeze on the following channels:
+        - [ ] https://matrix.to/#/#galaxyproject_ui-ux:gitter.im
+        - [ ] https://matrix.to/#/#galaxyproject_backend:gitter.im
+
+      Use the following message:
+
+      > As of today, we are officially frozen for ${version}. No new features or enhancements should be added to the ${version} milestone after this point. Reviews are appreciated so we can proceed with branching. Remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A${version}
+
+- [ ] **Review Merged Pull Requests**
+
+    - [ ] Identify merged pull requests [missing a milestone](https://github.com/galaxyproject/galaxy/pulls?utf8=%E2%9C%93&q=is%3Apr+is%3Amerged+no%3Amilestone+-label%3Amerge+sort%3Amerged+) merged since `release_${previous_version}` and assign the correct milestone.
+    - [ ] Review titles of all pull requests in the `${version}` milestone. Adjust them conservatively to match Galaxy contribution guidelines.
 
 - [ ] **Branch Release**
 
-    - [ ] Add latest database revision identifier (for ``release_${version}`` and ``${version}``) to ``REVISION_TAGS`` in ``lib/galaxy/model/migrations/dbrevisions.py``.
+    - [ ] Add latest database revision identifier to ``REVISION_TAGS`` in ``lib/galaxy/model/migrations/dbrevisions.py``. To obtain the identifier, ensure `dev` is up to date and run:
+
+          git pull upstream dev
+          ./manage_db.sh version
+
+      Note the revision identifier marked as head. Add the mapping for ``${version}`` and open a pull request.
 
     - [ ] Merge the latest release into dev and push upstream.
 
@@ -204,7 +230,47 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           make release-create-rc
 
-    - [ ] Open pull requests from your fork of branch ``version-${version}.rc1`` to upstream ``release_${version}`` and of ``version-${next_version}.dev`` to ``dev``.
+      This creates two branches:
+
+        - ``version-${next_version}.dev``: Open a pull request against `dev`. Verify the future version number and remove any generated client hash build artifacts if present.
+        - ``version-${version}.rc1``: Open a pull request against `release_${version}`.
+
+      Note: These steps may silently fail without producing any branches. Inspect ``cat packages/app/make-dist.log`` if branches were not created.
+
+    - [ ] Create a new GitHub label `release-testing-${version}` at https://github.com/galaxyproject/galaxy/labels to tag all release testing PRs.
+
+    - [ ] Announce branching on the following channels:
+        - [ ] https://matrix.to/#/#galaxyproject_ui-ux:gitter.im
+        - [ ] https://matrix.to/#/#galaxyproject_backend:gitter.im
+
+      Use the following message:
+
+      > The ${version} release branch has been created.
+
+- [ ] **Assemble Testing Team**
+
+    - [ ] Reach out per email to assemble the testing team for `${version}`. Use the following template:
+
+      > **Galaxy ${version} Release Testing**
+      >
+      > Hi,
+      >
+      > I am organizing testing for the upcoming Galaxy release and would like to ask whether you would be available to participate.
+      >
+      > **Testing window:**
+      > <START_DATE> through <END_DATE>
+      >
+      > **Time commitment:**
+      > Approximately 1-2 hours per day. Testing consists of working through as many assigned PRs as time permits. There will be one short kick off meeting immediately before testing begins.
+      >
+      > **What release testing involves:**
+      > Release testing focuses on validating Galaxy GitHub pull requests. Each PR represents either a new feature, an enhancement, or a bug fix. Testing means exercising the changes as a user would and verifying that they behave correctly and do not introduce regressions. A curated list of PRs will be provided, and detailed guidance on the testing workflow and PR selection will be covered in the kick off meeting.
+      >
+      > I will be available throughout the testing period, and the galaxyproject/release-testing channel on Element will be used for coordination and questions.
+      >
+      > If you are able to participate, I will follow up with concrete details.
+      >
+      > Thanks!
 
 - [ ] **Run tool and workflow tests:**
 
@@ -250,7 +316,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
           git checkout release_${version} -b ${version}_release_notes
     - [ ] Bootstrap the release notes
 
-          galaxy-release-util create-changelog ${version} --release-date ${release_date} --next-version ${next_version}
+          galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
     - [ ] Open newly created files and manually curate major topics and release notes.
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
@@ -261,6 +327,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Update usegalaxy.org to ensure it is running the ``release_${version}`` branch.
     - [ ] Request that toolshed.g2.bx.psu.edu is updated to ``${version}``.
     - [ ] Conduct second stage of release testing on usegalaxy.org.
+        - [ ] Verify weekly, ideally before or during a developer's meeting, by checking the Slack admin channel and asking for any new release related issues.
+        - [ ] Verify that there have not been any new release related issues in sentry.galaxyproject.org.
     - [ ] [Update BioBlend CI testing](https://github.com/galaxyproject/bioblend/blob/main/.github/workflows/test.yaml) to include a ``release_${version}`` target: add ``- release_${version}`` to the ``galaxy_version`` list in ``.github/workflows/test.yaml`` .
     - [ ] Update GALAXY_RELEASE in IUC and devteam github workflows
         - [ ] https://github.com/galaxyproject/tools-iuc/blob/master/.github/workflows/
@@ -270,15 +338,15 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Ensure all [blocking milestone issues](https://github.com/galaxyproject/galaxy/issues?q=is%3Aopen+is%3Aissue+milestone%3A${version}) have been resolved.
 
-          galaxy-release-util check-blocking-issues ${version}
+          galaxy-release-util check-blocking-issues ${version} --galaxy-root .
     - [ ] Ensure all [blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}) have been merged, closed, or postponed until the next release.
 
-          galaxy-release-util check-blocking-prs ${version} --release-date ${release_date}
+          galaxy-release-util check-blocking-prs ${version} --galaxy-root .
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze have [milestones attached](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+no%3Amilestone)
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are the not [${next_version} milestones](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
-          galaxy-release-util create-changelog ${version} --release-date ${release_date} --next-version ${next_version}
+          galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
 
@@ -308,30 +376,9 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 release_version_argument = click.argument("release-version", type=ClickVersion())
 
-next_version_option = click.option(
-    "--next-version",
-    type=ClickVersion(),
-    help="Next release version",
-)
-
-freeze_date_option = click.option(
-    "--freeze-date",
-    type=ClickDate(),
-    required=True,
-)
-
-release_date_option = click.option(
-    "--release-date",
-    type=ClickDate(),
-    required=True,
-)
-
 dry_run_option = click.option(
-    "--dry-run", type=bool, default=False, help="Do not connect to GitHub's API, print out output"
+    "--dry-run", is_flag=True, default=False, help="Do not connect to GitHub's API, print out output"
 )
-
-log = logging.getLogger(__name__)
-
 
 @click.group(help="Subcommands of this script can perform various tasks around creating Galaxy releases")
 def cli():
@@ -341,57 +388,93 @@ def cli():
 @cli.command(help="Create release checklist issue on GitHub")
 @group_options(
     release_version_argument,
-    next_version_option,
-    freeze_date_option,
     galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    next_version_option,
     release_date_option,
+    freeze_date_option,
     dry_run_option,
 )
 def create_release_issue(
     release_version: Version,
-    next_version: Version,
-    freeze_date: datetime.date,
     galaxy_root: Path,
-    release_date: datetime.date,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    next_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    previous_version = _get_previous_release_version(galaxy_root, release_version)
-    next_version = next_version or _get_next_release_version(release_version)
-    assert next_version > release_version, "Next release version should be greater than release version"
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, next_version, release_date, freeze_date,
+    )
+    if config.next_version is None:
+        raise click.UsageError("--next-version is required for create-release-issue")
+    if config.next_version <= config.current_version:
+        raise click.UsageError(f"--next-version ({config.next_version}) must be greater than release version ({config.current_version})")
 
     issue_template_params = dict(
         version=release_version,
-        next_version=next_version,
-        previous_version=previous_version,
-        freeze_date=freeze_date,
-        release_date=release_date,
+        next_version=config.next_version,
+        previous_version=config.previous_version,
+        freeze_date=config.freeze_date,
+        release_date=config.release_date,
     )
     issue_contents = RELEASE_ISSUE_TEMPLATE.substitute(**issue_template_params)
     issue_title = f"Publication of Galaxy Release v {release_version}"
 
     if dry_run:
-        print(issue_title)
-        print(issue_contents)
+        click.echo(issue_title)
+        click.echo(issue_contents)
         return None
     try:
         github = github_client()
-        repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
+        repo = github.get_repo(get_repo_name(config.owner, config.repo))
         release_issue = repo.create_issue(
             title=issue_title,
             body=issue_contents,
         )
         return release_issue
-    except GithubException:
-        log.exception(
-            "Failed to create an issue on GitHub. You need to be authenticated to use GitHub API."
-            "\nSee galaxy_release_util/github_client.py"
-        )
+    except GithubException as e:
+        raise click.ClickException(
+            f"Failed to create release issue on GitHub: {e}. "
+            "Ensure GITHUB_AUTH is set to a valid personal access token."
+        ) from e
 
 
 @cli.command(help="Create or update release changelog")
-@group_options(release_version_argument, next_version_option, galaxy_root_option, release_date_option)
-def create_changelog(release_version: Version, next_version: Version, galaxy_root: Path, release_date: datetime.date):
+@group_options(
+    release_version_argument,
+    galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    next_version_option,
+    release_date_option,
+    freeze_date_option,
+    dry_run_option,
+)
+def create_changelog(
+    release_version: Version,
+    galaxy_root: Path,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    next_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
+    dry_run: bool,
+):
+    verify_galaxy_root(galaxy_root)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, next_version, release_date, freeze_date,
+    )
+    if config.next_version is None:
+        raise click.UsageError("--next-version is required for create-changelog")
+    release_date = config.release_date
+    next_version = config.next_version
 
     def create_announcement_file() -> None:
         month = calendar.month_name[release_date.month]
@@ -415,32 +498,80 @@ def create_changelog(release_version: Version, next_version: Version, galaxy_roo
         filename = _release_file(galaxy_root, f"{next_version}_announce.rst")
         _write_file(filename, content, skip_if_exists=True)
 
-    verify_galaxy_root(galaxy_root)
-    next_version = next_version or _get_next_release_version(release_version)
-
     create_announcement_file()
     create_user_announcement_file()
     create_prs_file()
     create_next_release_announcement_file()
-    _load_prs(galaxy_root, release_version, release_date)
+    if dry_run:
+        click.echo("Dry run: skipping GitHub API call to load PRs")
+    else:
+        _load_prs(galaxy_root, release_version, release_date, config.owner, config.repo)
 
 
 @cli.command(help="List release blocking PRs")
-@group_options(release_version_argument, release_date_option)
-def check_blocking_prs(release_version: Version, release_date: datetime.date):
+@group_options(
+    release_version_argument,
+    galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    release_date_option,
+    freeze_date_option,
+    dry_run_option,
+)
+def check_blocking_prs(
+    release_version: Version,
+    galaxy_root: Path,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
+    dry_run: bool,
+):
+    verify_galaxy_root(galaxy_root)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, None, release_date, freeze_date,
+    )
+    if dry_run:
+        click.echo(f"Dry run: would check blocking PRs for milestone {release_version}")
+        sys.exit(0)
     block = 0
-    for pr in _get_prs(release_version, release_date, state="open"):
+    for pr in _get_prs(release_version, config.release_date, config.owner, config.repo, state="open"):
         click.echo(f"Blocking PR| {_pr_to_str(pr)}", err=True)
         block = 1
     sys.exit(block)
 
 
 @cli.command(help="List release blocking issues")
-@group_options(release_version_argument)
-def check_blocking_issues(release_version: Version):
+@group_options(
+    release_version_argument,
+    galaxy_root_option,
+    release_config_option,
+    previous_version_option,
+    release_date_option,
+    freeze_date_option,
+    dry_run_option,
+)
+def check_blocking_issues(
+    release_version: Version,
+    galaxy_root: Path,
+    release_config: Optional[Path],
+    previous_version: Optional[Version],
+    release_date: Optional[datetime.date],
+    freeze_date: Optional[datetime.date],
+    dry_run: bool,
+):
+    verify_galaxy_root(galaxy_root)
+    config = load_release_config(
+        galaxy_root, release_version, release_config,
+        previous_version, None, release_date, freeze_date,
+    )
+    if dry_run:
+        click.echo(f"Dry run: would check blocking issues for milestone {release_version}")
+        sys.exit(0)
     block = 0
     github = github_client()
-    repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
+    repo = github.get_repo(get_repo_name(config.owner, config.repo))
     issues = repo.get_issues(state="open")
     for issue in issues:
         if (
@@ -458,30 +589,44 @@ def _get_prs_file(galaxy_root: Path, release_version: Version) -> Path:
     return _release_file(galaxy_root, f"{release_version}_prs.rst")
 
 
-def _load_prs(galaxy_root: Path, release_version: Version, release_date: datetime.date) -> None:
+def _load_prs(
+    galaxy_root: Path,
+    release_version: Version,
+    release_date: datetime.date,
+    owner: str = PROJECT_OWNER,
+    repo: str = PROJECT_NAME,
+) -> None:
 
     def get_prs_from_prs_file() -> Set[int]:
         with open(_get_prs_file(galaxy_root, release_version)) as fh:
             return set(map(int, re.findall(r"\.\. _Pull Request (\d+): https", fh.read())))
 
     seen_prs = get_prs_from_prs_file()
-    prs = _get_prs(release_version, release_date)
+    prs = _get_prs(release_version, release_date, owner, repo)
     n_prs = len(prs)
     for i, pr in enumerate(prs):
         if pr.number not in seen_prs:
-            print(f"Processing PR {i + 1} of {n_prs}")
+            click.echo(f"Processing PR {i + 1} of {n_prs}")
             _pr_to_doc(
                 galaxy_root=galaxy_root,
                 release_version=release_version,
                 pr=pr,
+                owner=owner,
+                repo=repo,
             )
         else:
-            print(f"Skipping PR {i + 1} of {n_prs} (previously processed)")
+            click.echo(f"Skipping PR {i + 1} of {n_prs} (previously processed)")
 
 
-def _get_prs(release_version: Version, release_date: datetime.date, state: str = "closed") -> List[PullRequest]:
+def _get_prs(
+    release_version: Version,
+    release_date: datetime.date,
+    owner: str = PROJECT_OWNER,
+    repo_name: str = PROJECT_NAME,
+    state: str = "closed",
+) -> List[PullRequest]:
     github = github_client()
-    repo = github.get_repo(f"{PROJECT_OWNER}/{PROJECT_NAME}")
+    repo = github.get_repo(get_repo_name(owner, repo_name))
 
     # A pull request that was last updated before the previous release branch was created cannot be part of this release:
     # the value of `updated_at` is updated on merge, so it had to be merged before the branch existed and, therefore, included in the previous release.
@@ -494,14 +639,15 @@ def _get_prs(release_version: Version, release_date: datetime.date, state: str =
 
     prs: List[PullRequest] = []
     counter = 0
-    print("Collecting relevant pull requests...")
+    click.echo("Collecting relevant pull requests...")
     for pr in repo.get_pulls(state=state, sort="updated", direction="desc"):
-        assert pr.updated_at
+        if pr.updated_at is None:
+            continue
         if pr.updated_at.replace(tzinfo=None) < cutoff_time:
             break
         counter += 1
         if counter % 100 == 0:
-            print(
+            click.echo(
                 f"Examined {counter} PRs; collected {len(prs)} (currently on #{pr.number} updated on {pr.updated_at.date()})"
             )
         # Select PRs that are merged + have correct milestone + have not been previously collected and added to the prs file
@@ -509,11 +655,18 @@ def _get_prs(release_version: Version, release_date: datetime.date, state: str =
         if proper_state and pr.milestone and pr.milestone.title == str(release_version):
             prs.append(pr)
 
-    print(f"Collected {len(prs)} pull requests")
+    click.echo(f"Collected {len(prs)} pull requests")
     return prs
 
 
-def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> None:
+def _pr_to_doc(
+    galaxy_root: Path,
+    release_version: Version,
+    pr: PullRequest,
+    owner: str = PROJECT_OWNER,
+    repo: str = PROJECT_NAME,
+) -> None:
+    project_url = get_project_url(owner, repo)
 
     def extend_target(target: str, line: str, source: str) -> str:
         from_str = f".. {target}\n"
@@ -523,15 +676,8 @@ def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> 
 
     def extend_prs_file_content(filename: Path) -> None:
         content = _read_file(filename)
-        text = f".. _Pull Request {pr.number}: {PROJECT_URL}/pull/{pr.number}"
+        text = f".. _Pull Request {pr.number}: {project_url}/pull/{pr.number}"
         content = extend_target("github_links", text, content)
-        _write_file(filename, content)
-
-    def extend_release_file_content(filename: Path) -> None:
-        content = _read_file(filename)
-        text_target = _text_target(pr)
-        if text_target is not None:
-            content = extend_target(text_target, to_doc, content)
         _write_file(filename, content)
 
     def extend_user_announce_file_content(filename: Path) -> None:
@@ -546,10 +692,10 @@ def _pr_to_doc(galaxy_root: Path, release_version: Version, pr: PullRequest) -> 
         _write_file(filename, content)
 
     def make_pr_to_doc() -> str:
-        to_doc = pr.title.rstrip(".") + " "
+        to_doc = escape_rst_inline(pr.title).rstrip(".") + " "
         to_doc += f"\n(thanks to `@{pr.user.login} <https://github.com/{pr.user.login}>`__)."
         to_doc += f"\n`Pull Request {pr.number}`_"
-        return wrap(to_doc)
+        return wrap(to_doc, owner, repo)
 
     to_doc = make_pr_to_doc()
 
@@ -572,57 +718,23 @@ def _write_file(path: Path, contents: str, skip_if_exists: bool = False) -> None
         f.write(contents)
 
 
-def _get_next_release_version(version: Version) -> Version:
-    return Version(f"{version.major}.{version.minor + 1}")
-
-
-def _get_previous_release_version(galaxy_root: Path, version: Version) -> Optional[Version]:
-    """Return previous release version if it exists."""
-    # NOTE: We convert strings to Version objects to compare apples to apples:
-    # str(Version(foo)) is not the same as the string foo: str(Version("22.05")) == "22.5"
-    prev = None
-    for release in _get_release_version_strings(galaxy_root):
-        release_version = Version(release)
-        if release_version >= version:
-            return prev
-        prev = release_version
-    return prev
-
-
-def _get_release_version_strings(galaxy_root: Path) -> List[str]:
-    """Return sorted list of release version strings."""
-    all_files = _get_release_documentation_filenames(galaxy_root)
-    release_notes_file_pattern = re.compile(r"\d+\.\d+.rst")
-    filenames = [f.rstrip(".rst") for f in all_files if release_notes_file_pattern.match(f)]
-    return sorted(filenames)
-
-
-def _get_release_documentation_filenames(galaxy_root: Path) -> List[str]:
-    """Return contents of release documentation directory."""
-    releases_path = galaxy_root / "doc" / "source" / "releases"
-    if not os.path.exists(releases_path):
-        msg = f"Path to releases documentation not found: {releases_path}"
-        raise Exception(msg)
-    return sorted(os.listdir(releases_path))
-
-
 def _release_file(galaxy_root: Path, filename: Optional[str]) -> Path:
     """Construct and return path to a release documentation file."""
     filename = filename or OLDER_RELEASES_FILENAME
     return galaxy_root / "doc" / "source" / "releases" / filename
 
 
-def _process_sentence(message: str) -> str:
+def _process_sentence(message: str, owner: str = PROJECT_OWNER, repo: str = PROJECT_NAME) -> str:
     # Strip tags like [15.07].
     message = strip_release(message=message)
     # Link issues and pull requests...
-    issue_url = f"https://github.com/{PROJECT_OWNER}/{PROJECT_NAME}/issues"
+    issue_url = f"https://github.com/{owner}/{repo}/issues"
     message = re.sub(r"#(\d+)", rf"`#\1 <{issue_url}/\1>`__", message)
     return message
 
 
-def wrap(message: str) -> str:
-    message = _process_sentence(message)
+def wrap(message: str, owner: str = PROJECT_OWNER, repo: str = PROJECT_NAME) -> str:
+    message = _process_sentence(message, owner, repo)
     wrapper = textwrap.TextWrapper(initial_indent="* ")
     wrapper.subsequent_indent = "  "
     wrapper.width = 160
@@ -634,6 +746,4 @@ def wrap(message: str) -> str:
 
 
 def _issue_to_str(issue: Issue) -> str:
-    if isinstance(issue, str):
-        return issue
     return f"Issue #{issue.number} ({issue.title}) {issue.html_url}"

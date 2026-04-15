@@ -1,57 +1,58 @@
 # Galaxy Release Manager Tasks
 
-This document provides a step-by-step guide for managing Galaxy releases. It outlines the key responsibilities of the release manager, from determining the freeze date to preparing and executing the release. Each step includes practical instructions, recommended commands, and communication guidelines to ensure a smooth and coordinated release process.
+This document provides a step by step guide for preparing a Galaxy release. It covers all steps up to and including the creation of the release publication issue. Once the issue is created, all subsequent steps are tracked as checkboxes in the issue itself, making it the single source of truth for the release process.
+
+## Terminology
+
+* RELEASE_TAG: the release being prepared, for example 26.0
+* PREVIOUS_RELEASE_TAG: the last published release, for example 25.1
+* NEXT_RELEASE_TAG: the next planned release, for example 26.1
+* FREEZE_DATE: the date the release branch is frozen, for example 2026-01-27
+* RELEASE_DATE: the anticipated publication date, for example 2026-02-17
 
 ## Tasks
 
-### Step 1: Determine Freeze and Release Date
+### Step 1: Determine Freeze and Release Dates
 
-Discuss and agree on an appropriate freeze date (FREEZE_DATE) and anticipated release date (RELEASE_DATE) with the team during a dev meeting.
+Discuss and agree on a tentative freeze date (FREEZE_DATE) and anticipated release date (RELEASE_DATE) with the team during a dev meeting. These dates are provisional until confirmed at the Freeze Meeting.
+
+---
 
 ### Step 2: Announce Freeze Meeting
 
-Two weeks before the actual freeze, we announce the freeze meeting for the upcoming week.
+Two weeks before the planned freeze, announce the Freeze Meeting for the following week. The meeting is held one week before the actual freeze.
 
-1. Send the following message:
+Send the following message:
 
->🗓️ Freeze Meeting on <FREEZE_MEETING_DATE>
+> Freeze Meeting on <FREEZE_MEETING_DATE>
 >
->We will meet on <FREEZE_MEETING_DATE> for the Freeze Meeting, one week before the actual freeze. We will review open PRs, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges are completed by the freeze date. If you have outstanding PRs, please make sure they are set to ready-for-review before the meeting.
+> We will meet on <FREEZE_MEETING_DATE> for the Freeze Meeting, one week before the actual freeze. We will review open PRs, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure merges are completed by the freeze date. If you have outstanding PRs, please make sure they are set to ready for review before the meeting.
 
-2. To these channels:
+Send this message to at least the following channels:
 
-- https://matrix.to/#/#galaxyproject_ui-ux:gitter.im
-- https://matrix.to/#/#galaxyproject_backend:gitter.im
-- ...
+* [https://matrix.to/#/#galaxyproject_ui-ux:gitter.im](https://matrix.to/#/#galaxyproject_ui-ux:gitter.im)
+* [https://matrix.to/#/#galaxyproject_backend:gitter.im](https://matrix.to/#/#galaxyproject_backend:gitter.im)
 
+---
 
-### Step 3: The Freeze Meeting
-One week before the freeze, we hold the Freeze Meeting, usually during a weekly dev meeting. In this meeting, we review open PRs, decide what will be included in the <RELEASE_TAG> release, and assign reviewers to ensure PRs are merged by the freeze date. Focus on non-draft, non-bug PRs for this discussion. 
+### Step 3: Install Galaxy Release Utility
 
-To list all PRs for discussion:
+Much of the release process is automated using `galaxy-release-util`. Ensure it is installed and up to date.
 
-1. Go to: https://github.com/galaxyproject/galaxy/pulls, search for:
-```
-is:open is:pr milestone:<RELEASE_TAG> -label:kind/bug -is:draft
-```
-
-### Step 4: Install Galaxy Release Utility
-Much of the release process has been automated with `galaxy-release-util`. In the following section, we show how to install it and ensure that your installed version is up-to-date.
-
-1. If not already cloned:
+1. Clone the repository if not already present:
 
 ```bash
 git clone https://github.com/galaxyproject/galaxy-release-util
 ```
 
-2. Update with latest changes:
+2. Update to the latest version:
 
 ```bash
 cd galaxy-release-util
 git pull
 ```
 
-3. Install and activate:
+3. Install and activate the virtual environment:
 
 ```bash
 python -m venv .venv
@@ -59,164 +60,106 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-4. Verify version:
-
-Use the `which` command to confirm that the version of `galaxy-release-util` being used is the one installed in the your virtual environment.
+4. Verify that the correct executable is used:
 
 ```bash
 which galaxy-release-util
 ```
 
-### Step 5: Close Previous Release Publication Issues
-We ensure that all previous release publication issues are closed before publishing a new one.
+All subsequent uses of `galaxy-release-util` are expected to be run from this virtual environment.
 
-1. Go to: https://github.com/galaxyproject/galaxy/issues
-   
+---
+
+### Step 4: Close Previous Release Publication Issues
+
+Ensure all previous release publication issues are closed before starting a new release to avoid ambiguity about which checklist corresponds to the active release.
+
+1. Go to [https://github.com/galaxyproject/galaxy/issues](https://github.com/galaxyproject/galaxy/issues)
+
 2. Search for: `Publication of Galaxy Release`
- 
-3. Select and close previous publication issues
 
-### Step 6: Open New Release Publication Issue
-Using `galaxy-release-util`, we are now ready to publish the release issue on `GitHub`, which will publicly track the release publication stages using a checklist of items.
+3. Close any previous publication issues that are still open
 
-1. Make sure that you are in your `galaxy-release-util` virtual environment.
+---
 
-2. Enter your Galaxy root directory:
+### Step 5: Create and Configure a GitHub Authentication Token
+
+This step enables authenticated access for `galaxy-release-util` to create release issues, milestones, and related metadata on GitHub. Classic tokens are required because fine grained tokens do not currently provide the necessary permissions.
+
+1. Create a classic GitHub personal access token:
+
+   * Navigate to [https://github.com](https://github.com)
+   * Open your profile menu
+   * Select Settings
+   * Select Developer settings
+   * Select Personal access tokens
+   * Select Tokens (classic)
+   * Click Generate new token
+   * Select Generate new token (classic)
+   * Add a descriptive note indicating Galaxy release management
+   * Enable the following scopes:
+
+     * `repo`
+     * `write:packages`
+     * `delete:packages`
+     * `admin:repo_hook`
+   * Generate the token
+
+2. Export the token in your shell environment:
+
+```bash
+export GITHUB_AUTH=<TOKEN>
+```
+
+3. Ensure the variable is available in the same shell session where `galaxy-release-util` will be executed.
+
+---
+
+### Step 6: Create Release Config YAML
+
+All release metadata is defined in a single YAML config file. Once committed, all `galaxy-release-util` commands load it automatically from the default path given a release version.
+
+1. Change to your Galaxy root directory:
+
 ```bash
 cd <GALAXY_ROOT>
 ```
 
-3. Review the release issue output in the terminal (`--dry-run yes`):
-```
-galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date 'YEAR-MONTH-DAY' --release-date 'YEAR-MONTH-DAY' --next-version <NEXT_RELEASE_TAG> --dry-run yes
-```
+2. Create the release config file at `doc/source/releases/release_<RELEASE_TAG>.yml`:
 
-4. Re-run the above command without the `--dry-run` argument to actually open a release publication issue on `GitHub`.
-
-### Step 7: Create Milestone for Future Release
-Using the GitHub interface, create a new milestone.
-
-1. Go to https://github.com/galaxyproject/galaxy/milestones
-  
-2. Click **New milestone** and create a new milestone
-
-3. Note the milestone number from the URL:  
-```
-https://github.com/galaxyproject/galaxy/milestone/<MILESTONE_NUMBER>
+```yaml
+current-version: "<RELEASE_TAG>"
+previous-version: "<PREVIOUS_RELEASE_TAG>"
+freeze-date: "<FREEZE_DATE>"
+release-date: "<RELEASE_DATE>"
 ```
 
-5. Edit https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml and update `<MILESTONE_NUMBER>` so new pull requests are tagged with the correct milestone
+All fields are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository. The `next-version` value is provided via the `--next-version` CLI flag on commands that require it (e.g. `create-release-issue`, `create-changelog`).
 
-6. Open a pull request to update the milestone.  
-   Example: https://github.com/galaxyproject/galaxy/pull/20946
+3. Commit this file to the repository so it is available for all subsequent release commands.
 
-### Step 8: Are we good to freeze?
+---
 
-Use the following filter to identify PRs without `kind/*` labels and assign the appropriate `kind/*` labels. This helps compile the final list of PRs for the current milestone that must be included in the release by the freeze date.
+### Step 7: Open New Release Publication Issue
 
-1. Go to: https://github.com/galaxyproject/galaxy/pulls and search for:
-```
-is:open is:pr milestone:<RELEASE_TAG> -label:"kind/feature" -label:"kind/bug" -label:"kind/enhancement" -label:"kind/refactoring" -label:dependencies
-```
+Using `galaxy-release-util`, create the release publication issue that tracks all remaining release tasks.
 
-2. Assign proper labels, and milestones to these PRs
+1. Ensure you are in the `galaxy-release-util` virtual environment.
 
-### Step 9: Review of Blockers
+2. Change to your Galaxy root directory:
 
-Write the following message to above channels:
-
-> 📌 We're Frozen!
-> Hey everyone!
-> As planned, as of today we're officially frozen for <RELEASE_TAG> - no new features or enhancements against the <RELEASE_TAG> milestone after this point.
-> We still have <NUMBER_OF_OPEN_PRS> PRs from the freeze list that need to be merged before we can branch. It would be great if folks can review these remaining ones as soon as possible, so we can actually branch. Even if a PR is assigned to someone else, feel free to jump in with a review!
-> Link to the remaining PRs: https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+-label%3A%22kind%2Fbug%22+-is%3Adraft+milestone%3A<RELEASE_TAG>
-
-### Step 10: Review Merged PRs
-
-1. Go to: https://github.com/galaxyproject/galaxy/pulls
-
-2. Identify all PRs merged since the last release that are missing the appropriate tag and assign the correct tag. Search for:
-```
-is:pr is:merged -label:merge sort:merged merged:><YEAR-MONTH-DAY-PREVIOUS-RELEASE> -milestone:<RELEASE_TAG>
-```
-
-4. Review all PRs for the new release and update their titles as needed according to the Galaxy contributing guidelines, particularly point 6: https://github.com/galaxyproject/galaxy/blob/dev/CONTRIBUTING.md#how-to-contribute. Search for:
-```
-is:pr milestone:<RELEASE_TAG>
-```
-
-### Step 11: Update Database Revision
-
-1. Switch to your `dev` branch and ensure it is up to date, for example by running:  
 ```bash
-git pull upstream dev
+cd <GALAXY_ROOT>
 ```
 
-2. Run:  
+3. Review the generated release issue content:
+
 ```bash
-./manage_db.sh version
+galaxy-release-util create-release-issue <RELEASE_TAG> --galaxy-root . --next-version <NEXT_RELEASE_TAG> --dry-run
 ```
 
-3. Note the first revision identifier `<DB_REVISION> (gxy) (head)`.
+To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
 
-4. Edit `lib/galaxy/model/migrations/dbrevisions.py` and add a new entry:  
-```
-"<RELEASE_TAG>": "<DB_REVISION>",
-```
+4. Re run the command without `--dry-run` to open the issue on GitHub.
 
-6. Open a pull request to update the database revision.  
-   Example: https://github.com/galaxyproject/galaxy/pull/21017
-
-### Step 12: Merge Previous Release into `dev`
-
-1. Check out the previous release:  
-```bash
-git checkout release_<PREVIOUS_RELEASE_TAG>
-```
-
-2. Ensure the previous release is up to date:  
-```bash
-git pull upstream release_<PREVIOUS_RELEASE_TAG>
-```
-
-3. Check out `dev` and merge the previous release into it:  
-```bash
-git checkout dev
-git merge release_<PREVIOUS_RELEASE_TAG>
-git commit -a -m "Merge <PREVIOUS_RELEASE_TAG> into dev"
-git push
-```
-
-6. Open a pull request against `dev` and merge it.
-
-### Step 13: Create Release Candidate Branches
-
-1. Check out the `dev` branch and pull the latest changes:  
-```bash
-git checkout dev
-git pull upstream dev
-```
-
-2. Run the release creation command:  
-```bash
-make release-create-rc
-```
-
-3. This command creates two branches:
-
-   **a. `version-<FUTURE_RELEASE_TAG>.dev`**  
-   Title: `Version <FUTURE_RELEASE_TAG>.dev`  
-   - Open a pull request **against `dev`**.  
-     Example: [https://github.com/galaxyproject/galaxy/pull/21020](https://github.com/galaxyproject/galaxy/pull/21020)  
-   - **Note:** Manually verify this step because it:  
-     1. may generate the wrong future release number  
-     2. adds a client-hash-build file that must be removed
-
-   **b. `version-<RELEASE_TAG>.rc1`**  
-   Title: `Update version to <RELEASE_TAG>.rc1`  
-   - Open a pull request **against `galaxyproject:release_<RELEASE_TAG>`**.  
-     Example: [https://github.com/galaxyproject/galaxy/pull/21019](https://github.com/galaxyproject/galaxy/pull/21019)
-
-
-   
-   
+All subsequent release steps are tracked as checkboxes in the publication issue.

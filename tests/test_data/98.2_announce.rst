@@ -5,25 +5,8 @@
 
 .. include:: _header.rst
 
-Highlights
-===========================================================
-
-Feature1
---------
-
-Feature description.
-
-Feature2
---------
-
-Feature description.
-
-Feature3
---------
-
-Feature description.
-
 Please see the `98.2 user release notes <98.2_announce_user.html>`__ for a summary of new user features.
+The `GitHub Release Notes <https://github.com/galaxyproject/galaxy/releases/tag/v98.2.0>`__ provide a comprehensive overview of all changes.
 
 Get Galaxy
 ===========================================================
@@ -49,7 +32,9 @@ Add content or drop section.
 
 Configuration Changes
 ===========================================================
-Add content or drop section.
+Run ``python scripts/release-diff.py release_<previous_version>`` in the Galaxy root directory
+to get a diff of configuration changes between releases.
+Add any more content or drop section if it's empty.
 
 Deprecation Notices
 ===========================================================
@@ -58,12 +43,6 @@ Add content or drop section.
 Developer Notes
 ===========================================================
 Add content or drop section.
-
-Release Notes
-===========================================================
-
-.. include:: 98.2.rst
-   :start-after: announce_start
 
 Release Team
 ===========================================================

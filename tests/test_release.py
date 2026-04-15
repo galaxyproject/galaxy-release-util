@@ -1,8 +1,10 @@
+import inspect
 import pathlib
 
 import pytest
 from packaging.version import Version
 
+import galaxy_release_util.point_release as point_release_module
 from galaxy_release_util.point_release import (
     get_major_minor_version_strings,
     get_next_devN_version,
@@ -75,3 +77,16 @@ def test_get_major_minor_version_strings():
     major, minor = get_major_minor_version_strings(version)
     assert major == "21.0"
     assert minor == "0"
+
+
+def test_no_module_level_github_client():
+    """Verify that point_release module does not create a GitHub client at import time."""
+    source = inspect.getsource(point_release_module)
+    # The module should not have a top-level `g = github_client()` call.
+    # github_client() should only be called inside functions.
+    lines = source.splitlines()
+    for line in lines:
+        stripped = line.strip()
+        # Skip comments and lines inside functions/classes (indented)
+        if line and not line[0].isspace() and "github_client()" in stripped and not stripped.startswith("#"):
+            pytest.fail(f"Module-level github_client() call found: {line}")

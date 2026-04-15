@@ -1,12 +1,11 @@
 import re
 from typing import List
 
+import click
 from github.PullRequest import PullRequest
 
 PROJECT_OWNER = "galaxyproject"
 PROJECT_NAME = "galaxy"
-PROJECT_URL = f"https://github.com/{PROJECT_OWNER}/{PROJECT_NAME}"
-PROJECT_API = f"https://api.github.com/repos/{PROJECT_OWNER}/{PROJECT_NAME}/"
 
 GROUPED_TAGS = dict(
     [
@@ -22,8 +21,6 @@ GROUPED_TAGS = dict(
 
 
 def _pr_to_str(pr):
-    if isinstance(pr, str):
-        return pr
     return f"PR #{pr.number} ({pr.title}) {pr.html_url}"
 
 
@@ -32,7 +29,7 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
     labels = [label.name.lower() for label in pull_request.labels]
     is_bug = is_enhancement = is_feature = is_minor = is_major = is_merge = is_small_enhancement = False
     if len(labels) == 0:
-        print(f"No labels found for {pr_number}")
+        click.echo(f"No labels found for {pr_number}", err=True)
         return None
     for label_name in labels:
         if label_name == "minor":
@@ -56,10 +53,10 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
     is_some_kind_of_enhancement = is_enhancement or is_feature or is_small_enhancement
 
     if not (is_bug or is_some_kind_of_enhancement or is_minor or is_merge):
-        print(f"No 'kind/*' or 'minor' or 'merge' or 'procedures' label found for {_pr_to_str(pull_request)}")
+        click.echo(f"No 'kind/*' or 'minor' or 'merge' or 'procedures' label found for {_pr_to_str(pull_request)}", err=True)
         text_target = None
 
-    if is_minor or is_merge and skip_merge:
+    if (is_minor or is_merge) and skip_merge:
         return
 
     if is_some_kind_of_enhancement and is_major:
@@ -85,7 +82,7 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
         else:
             text_target = "bug"
     else:
-        print(f"Logic problem, cannot determine section for {_pr_to_str(pull_request)}")
+        click.echo(f"Logic problem, cannot determine section for {_pr_to_str(pull_request)}", err=True)
         text_target = None
     if text_target:
         text_target += "\n"
@@ -95,6 +92,14 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
 def _pr_to_labels(pr: PullRequest) -> List[str]:
     labels = [label.name.lower() for label in pr.labels]
     return labels
+
+
+def get_project_url(owner: str, name: str) -> str:
+    return f"https://github.com/{owner}/{name}"
+
+
+def get_repo_name(owner: str, name: str) -> str:
+    return f"{owner}/{name}"
 
 
 def strip_release(message):
