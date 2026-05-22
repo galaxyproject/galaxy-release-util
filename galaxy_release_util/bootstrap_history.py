@@ -343,7 +343,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
           galaxy-release-util check-blocking-prs ${version} --galaxy-root .
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze have [milestones attached](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+no%3Amilestone)
-    - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are the not [${next_version} milestones](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
+    - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are not in the [${next_version} milestone](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
           galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
