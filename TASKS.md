@@ -125,7 +125,7 @@ All release metadata is defined in a single YAML config file. Once committed, al
 cd <GALAXY_ROOT>
 ```
 
-2. Create the release config file at `doc/source/releases/release_<RELEASE_TAG>.yml`:
+2. Create the release config file at `doc/source/releases/<RELEASE_TAG>_release.yml`:
 
 ```yaml
 current-version: "<RELEASE_TAG>"

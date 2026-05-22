@@ -53,7 +53,7 @@ release_config_option = click.option(
     "--release-config",
     type=click.Path(exists=True, path_type=pathlib.Path),
     default=None,
-    help="Path to release config YAML. Default: {galaxy-root}/doc/source/releases/release_{version}.yml",
+    help="Path to release config YAML. Default: {galaxy-root}/doc/source/releases/{version}_release.yml",
 )
 
 previous_version_option = click.option(
