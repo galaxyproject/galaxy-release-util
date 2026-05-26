@@ -260,15 +260,19 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
       > **Testing window:**
       > <START_DATE> through <END_DATE>
       >
+      > **Kick off Meeting:**
+      > <KICK_OFF_DATE_TIME>
+      > Video call link: <MEETING_LINK>
+      >
       > **Time commitment:**
-      > Approximately 1-2 hours per day. Testing consists of working through as many assigned PRs as time permits. There will be one short kick off meeting immediately before testing begins.
+      > Approximately 1-2 hours per day. Testing consists of working through as many assigned PRs as time permits. There will be one short kick off meeting at the start of the testing window.
       >
       > **What release testing involves:**
       > Release testing focuses on validating Galaxy GitHub pull requests. Each PR represents either a new feature, an enhancement, or a bug fix. Testing means exercising the changes as a user would and verifying that they behave correctly and do not introduce regressions. A curated list of PRs will be provided, and detailed guidance on the testing workflow and PR selection will be covered in the kick off meeting.
       >
-      > I will be available throughout the testing period, and the galaxyproject/release-testing channel on Element will be used for coordination and questions.
+      > I will be available throughout the testing period, and the galaxyproject/release-testing Matrix room at https://matrix.to/#/%23galaxyproject_release-testing:gitter.im will be used for coordination and questions.
       >
-      > If you are able to participate, I will follow up with concrete details.
+      > If you are able to participate, I can follow up with more details.
       >
       > Thanks!
 
