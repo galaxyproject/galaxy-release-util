@@ -11,6 +11,9 @@ def escape_rst_inline(text: str) -> str:
 
 
 def version_filepath(galaxy_root: Path) -> Path:
+    package_init = Path(galaxy_root / "lib" / "galaxy" / "version" / "__init__.py")
+    if package_init.exists():
+        return package_init
     return Path(galaxy_root / "lib" / "galaxy" / "version.py")
 
 
