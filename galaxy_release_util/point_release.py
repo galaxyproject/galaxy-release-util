@@ -481,9 +481,10 @@ def merge_and_resolve_branches(
     # restore base galaxy versions
     galaxy_versions = [
         version_filepath(galaxy_root),
-        galaxy_root.joinpath("package.json"),
         galaxy_root.joinpath("client", "package.json"),
     ]
+    if galaxy_root.joinpath("package.json").exists():
+        galaxy_versions.append(galaxy_root.joinpath("package.json"))
     subprocess.run(
         ["git", "checkout", new_branch, *galaxy_versions],
         cwd=galaxy_root,
@@ -733,9 +734,9 @@ def update_client_version(galaxy_root: Path, new_version: Version, modified_path
     package_json_dict = json.loads(package_json.read_text())
     package_json_dict["version"] = str(new_version)
     package_json.write_text(f"{json.dumps(package_json_dict, indent=2)}\n")
-    if not new_version.is_devrelease:
+    root_package_json = galaxy_root.joinpath("package.json")
+    if not new_version.is_devrelease and root_package_json.exists():
         # Only update root package.json if not a dev release, since those are not uploaded to npm
-        root_package_json = galaxy_root.joinpath("package.json")
         modified_paths.append(root_package_json)
         root_package_json_dict = json.loads(root_package_json.read_text())
         root_package_json_dict["version"] = str(new_version)
