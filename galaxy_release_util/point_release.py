@@ -481,13 +481,27 @@ def merge_and_resolve_branches(
     # restore base galaxy versions
     galaxy_versions = [
         version_filepath(galaxy_root),
-        galaxy_root.joinpath("package.json"),
         galaxy_root.joinpath("client", "package.json"),
     ]
+    # Root package.json was removed in newer Galaxy releases. We must check git history
+    # rather than the filesystem because the merge may have reintroduced the file
+    # (git sees it as modified in base_branch vs. deleted in new_branch → conflict).
+    root_package_json = galaxy_root.joinpath("package.json")
+    git_check = subprocess.run(
+        ["git", "cat-file", "-e", f"{new_branch}:{root_package_json.relative_to(galaxy_root)}"],
+        cwd=galaxy_root,
+        capture_output=True,
+    )
+    if git_check.returncode == 0:
+        galaxy_versions.append(root_package_json)
     subprocess.run(
         ["git", "checkout", new_branch, *galaxy_versions],
         cwd=galaxy_root,
     )
+    # If package.json doesn't exist in new_branch, the merge leaves it as an
+    # unresolved delete/modify conflict. Resolve by removing it.
+    if git_check.returncode != 0:
+        subprocess.run(["git", "rm", "-f", "--ignore-unmatch", str(root_package_json)], cwd=galaxy_root)
     # we rewrite the packages changelog
     for new_package in packages_to_rewrite:
         previous_package = package_paths[new_package.path]
@@ -733,9 +747,9 @@ def update_client_version(galaxy_root: Path, new_version: Version, modified_path
     package_json_dict = json.loads(package_json.read_text())
     package_json_dict["version"] = str(new_version)
     package_json.write_text(f"{json.dumps(package_json_dict, indent=2)}\n")
-    if not new_version.is_devrelease:
+    root_package_json = galaxy_root.joinpath("package.json")
+    if not new_version.is_devrelease and root_package_json.exists():
         # Only update root package.json if not a dev release, since those are not uploaded to npm
-        root_package_json = galaxy_root.joinpath("package.json")
         modified_paths.append(root_package_json)
         root_package_json_dict = json.loads(root_package_json.read_text())
         root_package_json_dict["version"] = str(new_version)
