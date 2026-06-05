@@ -483,8 +483,17 @@ def merge_and_resolve_branches(
         version_filepath(galaxy_root),
         galaxy_root.joinpath("client", "package.json"),
     ]
-    if galaxy_root.joinpath("package.json").exists():
-        galaxy_versions.append(galaxy_root.joinpath("package.json"))
+    # Root package.json was removed in newer Galaxy releases. We must check git history
+    # rather than the filesystem because the merge may have reintroduced the file
+    # (git sees it as modified in base_branch vs. deleted in new_branch → conflict).
+    root_package_json = galaxy_root.joinpath("package.json")
+    git_check = subprocess.run(
+        ["git", "cat-file", "-e", f"{new_branch}:{root_package_json.relative_to(galaxy_root)}"],
+        cwd=galaxy_root,
+        capture_output=True,
+    )
+    if git_check.returncode == 0:
+        galaxy_versions.append(root_package_json)
     subprocess.run(
         ["git", "checkout", new_branch, *galaxy_versions],
         cwd=galaxy_root,
