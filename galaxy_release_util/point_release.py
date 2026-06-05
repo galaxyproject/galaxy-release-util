@@ -498,6 +498,10 @@ def merge_and_resolve_branches(
         ["git", "checkout", new_branch, *galaxy_versions],
         cwd=galaxy_root,
     )
+    # If package.json doesn't exist in new_branch, the merge leaves it as an
+    # unresolved delete/modify conflict. Resolve by removing it.
+    if git_check.returncode != 0:
+        subprocess.run(["git", "rm", "-f", "--ignore-unmatch", str(root_package_json)], cwd=galaxy_root)
     # we rewrite the packages changelog
     for new_package in packages_to_rewrite:
         previous_package = package_paths[new_package.path]
