@@ -863,9 +863,19 @@ def stage_changes_and_commit(
 
 
 def create_tag(galaxy_root: Path, release_tag: str, no_confirm: bool) -> None:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", f"refs/tags/{release_tag}"],
+        cwd=galaxy_root,
+        capture_output=True,
+    )
+    if result.returncode == 0:
+        raise Exception(
+            f"Tag '{release_tag}' already exists (points to {result.stdout.decode().strip()}). "
+            "Delete existing tag first with: git tag -d {release_tag}"
+        )
     if not no_confirm:
         click.confirm(f"Create git tag '{release_tag}'?", abort=True)
-    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root)
+    subprocess.run(["git", "tag", release_tag], cwd=galaxy_root).check_returncode()
 
 
 def merge_changes_into_newer_branches(
