@@ -125,7 +125,7 @@ All release metadata is defined in a single YAML config file. Once committed, al
 cd <GALAXY_ROOT>
 ```
 
-2. Create the release config file at `doc/source/releases/release_<RELEASE_TAG>.yml`:
+2. Create the release config file at `doc/source/releases/<RELEASE_TAG>_release.yml`:
 
 ```yaml
 current-version: "<RELEASE_TAG>"
@@ -134,7 +134,7 @@ freeze-date: "<FREEZE_DATE>"
 release-date: "<RELEASE_DATE>"
 ```
 
-All fields are required. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository. The `next-version` value is provided via the `--next-version` CLI flag on commands that require it (e.g. `create-release-issue`, `create-changelog`).
+All fields are required. The `freeze-date` and `release-date` values must use `YYYY-MM-DD` format. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository. The `next-version` value is provided via the `--next-version` CLI flag on commands that require it (e.g. `create-release-issue`, `create-changelog`).
 
 3. Commit this file to the repository so it is available for all subsequent release commands.
 

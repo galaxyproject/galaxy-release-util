@@ -31,7 +31,7 @@ def load_release_config(
 
     Resolution order:
     1. If --release-config is given, load that file (must exist).
-    2. Otherwise, try the default path {galaxy_root}/doc/source/releases/release_{version}.yml.
+    2. Otherwise, try the default path {galaxy_root}/doc/source/releases/{version}_release.yml.
     3. CLI flags (--previous-version, --next-version, --release-date, --freeze-date) override YAML values.
     4. If no YAML is found, all required values must come from CLI flags.
     """
@@ -82,7 +82,7 @@ def _try_load_yaml_config(
             raise FileNotFoundError(f"Release config not found: {release_config_path}")
         return _load_yaml_file(release_config_path, release_version)
 
-    default_path = galaxy_root / "doc" / "source" / "releases" / f"release_{release_version}.yml"
+    default_path = galaxy_root / "doc" / "source" / "releases" / f"{release_version}_release.yml"
     if not default_path.exists():
         return None
     return _load_yaml_file(default_path, release_version)
@@ -164,7 +164,7 @@ def load_repo_owner(
             raise FileNotFoundError(f"Release config not found: {release_config_path}")
         path = release_config_path
     else:
-        path = galaxy_root / "doc" / "source" / "releases" / f"release_{major_minor}.yml"
+        path = galaxy_root / "doc" / "source" / "releases" / f"{major_minor}_release.yml"
         if not path.exists():
             return ("galaxyproject", "galaxy")
     with open(path) as f:
