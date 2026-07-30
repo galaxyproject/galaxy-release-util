@@ -5,6 +5,20 @@ History
 
 
 ------------------
+0.4.0 (30-07-2026)
+------------------
+* Derive release metadata from GitHub milestones, drop the config YAML by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/54
+
+**Breaking change:** ``--release-config`` and the ``{version}_release.yml`` config
+file are gone. The release date now comes from the due date of the milestone naming
+the release, and the previous and next versions from its neighbouring milestones, so
+``create-changelog`` and ``check-blocking-prs`` no longer need dates passed to them.
+Pass ``--owner``/``--repo`` to work against a fork, and ``--release-date``,
+``--next-version`` or ``--previous-version`` to override what the milestones say.
+``--freeze-date`` remains required by ``create-release-issue``, since no milestone
+records it.
+
+------------------
 0.3.4 (30-07-2026)
 ------------------
 * Fix referenced paths after galaxy code restructure by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/50
