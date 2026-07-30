@@ -115,17 +115,21 @@ export GITHUB_AUTH=<TOKEN>
 
 ---
 
-### Step 6: Create Release Config YAML
+### Step 6: Create the GitHub Milestone
 
-All release metadata is defined in a single YAML config file. Once committed, all `galaxy-release-util` commands load it automatically from the default path given a release version.
+GitHub milestones are the source of truth for release metadata. `galaxy-release-util` reads them to work out:
 
-1. Change to your Galaxy root directory:
+* RELEASE_DATE, from the due date of the milestone named after RELEASE_TAG
+* PREVIOUS_RELEASE_TAG, the newest milestone preceding RELEASE_TAG
+* NEXT_RELEASE_TAG, the oldest milestone following RELEASE_TAG
 
-```bash
-cd <GALAXY_ROOT>
-```
+So the only setup required is a [milestone](https://github.com/galaxyproject/galaxy/milestones) titled `<RELEASE_TAG>` with its due date set to RELEASE_DATE. Nothing has to be committed to the Galaxy repository, and no command needs the dates passed on the command line.
 
-2. Create the release config file at `doc/source/releases/<RELEASE_TAG>_release.yml`:
+Any value can still be overridden with a flag, for example `--release-date 2026-02-17` or `--next-version 26.2`. FREEZE_DATE is not recorded anywhere on GitHub, so `create-release-issue` takes it as `--freeze-date`.
+
+#### Optional: release config YAML
+
+Values may also be pinned in a YAML file at `doc/source/releases/<RELEASE_TAG>_release.yml`, which is read automatically when it exists:
 
 ```yaml
 current-version: "<RELEASE_TAG>"
@@ -134,9 +138,7 @@ freeze-date: "<FREEZE_DATE>"
 release-date: "<RELEASE_DATE>"
 ```
 
-All fields are required. The `freeze-date` and `release-date` values must use `YYYY-MM-DD` format. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository. The `next-version` value is provided via the `--next-version` CLI flag on commands that require it (e.g. `create-release-issue`, `create-changelog`).
-
-3. Commit this file to the repository so it is available for all subsequent release commands.
+Every field is optional; anything omitted is resolved from the milestones. Dates use `YYYY-MM-DD` format. Two further fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` — set them when working against a fork or private repository, since they also decide which milestones are read.
 
 ---
 
@@ -155,10 +157,10 @@ cd <GALAXY_ROOT>
 3. Review the generated release issue content:
 
 ```bash
-galaxy-release-util create-release-issue <RELEASE_TAG> --galaxy-root . --next-version <NEXT_RELEASE_TAG> --dry-run
+galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date <FREEZE_DATE> --dry-run
 ```
 
-To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
+Everything else is read from the milestones. To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
 
 4. Re run the command without `--dry-run` to open the issue on GitHub.
 
