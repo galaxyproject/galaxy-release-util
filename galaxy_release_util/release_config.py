@@ -4,7 +4,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
+    Any,
     Dict,
+    Iterable,
+    Mapping,
     Optional,
 )
 
@@ -61,7 +64,6 @@ def load_release_config(
     freeze_date: Optional[datetime.date] = None,
     owner: str = PROJECT_OWNER,
     repo: str = PROJECT_NAME,
-    use_github: bool = True,
 ) -> ReleaseConfig:
     """Resolve release metadata for ``release_version``.
 
@@ -82,17 +84,32 @@ def load_release_config(
         owner=owner,
         repo=repo,
     )
-    if use_github:
-        _fill_from_milestones(config)
+    _fill_from_milestones(config)
     _fill_from_local_fallbacks(config, galaxy_root)
     return config
 
 
-def milestone_due_dates(owner: str, repo: str) -> Dict[Version, Optional[datetime.date]]:
-    """Return a {version: due date} mapping of all milestones that are named after a version.
+def due_dates_by_version(milestones: Iterable[Any]) -> Dict[Version, Optional[datetime.date]]:
+    """Map milestones named after a release version to their due dates.
 
-    Milestones without a due date map to ``None``. Returns an empty mapping (with a
-    warning) if GitHub cannot be reached, so callers can fall back to local information.
+    Titles that are not versions are skipped, since milestones are not required to
+    name a release. A milestone with no due date maps to ``None``.
+    """
+    due_dates: Dict[Version, Optional[datetime.date]] = {}
+    for milestone in milestones:
+        try:
+            version = Version(milestone.title)
+        except InvalidVersion:
+            continue
+        due_dates[version] = milestone.due_on.date() if milestone.due_on else None
+    return due_dates
+
+
+def milestone_due_dates(owner: str, repo: str) -> Dict[Version, Optional[datetime.date]]:
+    """Read the milestones of ``owner``/``repo`` as a {version: due date} mapping.
+
+    Returns an empty mapping (with a warning) if GitHub cannot be reached, so callers
+    can fall back to local information.
     """
     try:
         github_repo = github_client().get_repo(get_repo_name(owner, repo))
@@ -100,23 +117,15 @@ def milestone_due_dates(owner: str, repo: str) -> Dict[Version, Optional[datetim
     except Exception as e:  # noqa: BLE001 - missing auth, rate limits and network errors are all recoverable here
         click.echo(f"Warning: could not read milestones from {get_repo_name(owner, repo)}: {e}", err=True)
         return {}
-    due_dates: Dict[Version, Optional[datetime.date]] = {}
-    for milestone in milestones:
-        try:
-            version = Version(milestone.title)
-        except InvalidVersion:
-            continue  # Milestones are not required to be named after a release.
-        due_dates[version] = milestone.due_on.date() if milestone.due_on else None
-    return due_dates
+    return due_dates_by_version(milestones)
 
 
-def _fill_from_milestones(config: ReleaseConfig) -> None:
-    """Fill in release date and surrounding versions from the GitHub milestones."""
-    if config.release_date is not None and config.previous_version is not None and config.next_version is not None:
-        return  # Nothing left to look up, don't spend an API call.
-    due_dates = milestone_due_dates(config.owner, config.repo)
-    if not due_dates:
-        return
+def resolve_from_milestones(config: ReleaseConfig, due_dates: Mapping[Version, Optional[datetime.date]]) -> None:
+    """Fill gaps in ``config`` from a {version: due date} mapping, leaving set values alone.
+
+    The release date is the due date of the milestone naming the release; the
+    surrounding versions are its nearest neighbours.
+    """
     if config.release_date is None:
         config.release_date = due_dates.get(config.current_version)
     if config.previous_version is None:
@@ -127,6 +136,12 @@ def _fill_from_milestones(config: ReleaseConfig) -> None:
         later = [version for version in due_dates if version > config.current_version]
         if later:
             config.next_version = min(later)
+
+
+def _fill_from_milestones(config: ReleaseConfig) -> None:
+    if config.release_date is not None and config.previous_version is not None and config.next_version is not None:
+        return  # Nothing left to look up, don't spend an API call.
+    resolve_from_milestones(config, milestone_due_dates(config.owner, config.repo))
 
 
 def _fill_from_local_fallbacks(config: ReleaseConfig, galaxy_root: Path) -> None:

@@ -1,4 +1,5 @@
 import datetime
+from types import SimpleNamespace
 
 import pytest
 from packaging.version import Version
@@ -6,187 +7,146 @@ from packaging.version import Version
 from galaxy_release_util import release_config
 from galaxy_release_util.release_config import (
     ReleaseConfig,
+    due_dates_by_version,
     load_release_config,
+    resolve_from_milestones,
 )
 
-# Captured before the autouse stub below replaces it.
-real_milestone_due_dates = release_config.milestone_due_dates
-
+# The 26.x milestones as GitHub reports them.
 GALAXY_MILESTONES = {
     Version("26.0"): datetime.date(2026, 1, 27),
-    Version("26.1"): datetime.date(2026, 5, 20),
+    Version("26.1"): datetime.date(2026, 7, 30),
     Version("26.2"): datetime.date(2026, 10, 14),
 }
 
 
-@pytest.fixture
-def releases_dir(tmp_path):
-    path = tmp_path / "doc" / "source" / "releases"
-    path.mkdir(parents=True)
-    return path
+def _config(**kwargs) -> ReleaseConfig:
+    return ReleaseConfig(current_version=Version("26.1"), **kwargs)
 
 
-@pytest.fixture(autouse=True)
-def no_github(monkeypatch):
-    """Fail loudly if a test reaches for GitHub without saying so."""
-
-    def _explode(owner, repo):
-        raise AssertionError("test unexpectedly queried GitHub milestones")
-
-    monkeypatch.setattr(release_config, "milestone_due_dates", _explode)
+def _milestone(title, due_on=None):
+    """Stand-in for a PyGithub Milestone, which is a title and a due date to us."""
+    return SimpleNamespace(title=title, due_on=due_on)
 
 
-@pytest.fixture
-def milestones(monkeypatch):
-    """Stub the GitHub milestone lookup with a fixed {version: due date} mapping."""
-
-    def _set(due_dates=GALAXY_MILESTONES):
-        monkeypatch.setattr(release_config, "milestone_due_dates", lambda owner, repo: due_dates)
-
-    return _set
+# Reading milestones off GitHub -------------------------------------------------
 
 
-def test_everything_comes_from_the_milestones(tmp_path, milestones):
-    """The common case: nothing passed, everything read off the milestones."""
-    milestones()
-    config = load_release_config(tmp_path, Version("26.1"))
-    assert config.release_date == datetime.date(2026, 5, 20)
-    assert config.previous_version == Version("26.0")
-    assert config.next_version == Version("26.2")
+def test_milestone_titles_become_versions_and_due_dates_become_dates():
+    milestones = [_milestone("26.1", datetime.datetime(2026, 7, 30))]
+    assert due_dates_by_version(milestones) == {Version("26.1"): datetime.date(2026, 7, 30)}
 
 
-def test_flags_win_over_milestones(tmp_path, milestones):
-    milestones()
-    config = load_release_config(
-        tmp_path,
-        Version("26.1"),
-        release_date=datetime.date(2026, 6, 1),
-        next_version=Version("27.0"),
-        previous_version=Version("25.1"),
-        freeze_date=datetime.date(2026, 4, 15),
-    )
-    assert config.release_date == datetime.date(2026, 6, 1)
-    assert config.next_version == Version("27.0")
-    assert config.previous_version == Version("25.1")
-    assert config.freeze_date == datetime.date(2026, 4, 15)
+def test_milestones_not_named_after_a_release_are_skipped():
+    milestones = [_milestone("Backlog"), _milestone("sprint 4"), _milestone("26.1")]
+    assert list(due_dates_by_version(milestones)) == [Version("26.1")]
 
 
-def test_milestones_fill_only_the_gaps(tmp_path, milestones):
-    milestones()
-    config = load_release_config(tmp_path, Version("26.1"), next_version=Version("27.0"))
-    assert config.next_version == Version("27.0")
-    assert config.release_date == datetime.date(2026, 5, 20)
-
-
-def test_no_api_call_when_flags_cover_everything(tmp_path):
-    """The autouse guard would fire if the milestones were consulted here."""
-    config = load_release_config(
-        tmp_path,
-        Version("26.1"),
-        previous_version=Version("26.0"),
-        next_version=Version("26.2"),
-        release_date=datetime.date(2026, 5, 20),
-    )
-    assert config.release_date == datetime.date(2026, 5, 20)
-
-
-def test_milestone_without_due_date_leaves_release_date_unknown(tmp_path, milestones):
-    milestones({Version("26.1"): None})
-    config = load_release_config(tmp_path, Version("26.1"))
-    assert config.release_date is None
-
-
-def test_owner_and_repo_select_the_milestones(tmp_path, monkeypatch):
-    seen = {}
-
-    def _record(owner, repo):
-        seen["target"] = (owner, repo)
-        return {}
-
-    monkeypatch.setattr(release_config, "milestone_due_dates", _record)
-    config = load_release_config(tmp_path, Version("26.1"), owner="mvdbeek", repo="galaxy-fork")
-    assert seen["target"] == ("mvdbeek", "galaxy-fork")
-    assert (config.owner, config.repo) == ("mvdbeek", "galaxy-fork")
-
-
-def test_owner_and_repo_default_to_galaxy(tmp_path, milestones):
-    milestones()
-    config = load_release_config(tmp_path, Version("26.1"))
-    assert (config.owner, config.repo) == ("galaxyproject", "galaxy")
-
-
-def test_falls_back_to_release_notes_when_github_is_unavailable(tmp_path, releases_dir, milestones):
-    milestones({})
-    for documented in ("26.0.rst", "25.1.rst", "24.2.rst"):
-        (releases_dir / documented).write_text("")
-    config = load_release_config(tmp_path, Version("26.1"))
-    assert config.previous_version == Version("26.0")
-    assert config.next_version == Version("26.2")
-    assert config.release_date is None
-
-
-def test_previous_version_unknown_without_docs_or_milestones(tmp_path, milestones):
-    milestones({})
-    config = load_release_config(tmp_path, Version("26.1"))
-    assert config.previous_version is None
-
-
-def test_require_reports_missing_values(tmp_path, milestones):
-    milestones({})
-    config = load_release_config(tmp_path, Version("26.1"))
-    with pytest.raises(ValueError, match=r"--release-date, --freeze-date"):
-        config.require("release_date", "freeze_date")
-
-
-def test_require_error_names_the_repository(tmp_path, milestones):
-    milestones({})
-    config = load_release_config(tmp_path, Version("26.1"), owner="mvdbeek", repo="galaxy-fork")
-    with pytest.raises(ValueError, match="mvdbeek/galaxy-fork"):
-        config.require("release_date")
-
-
-def test_require_passes_when_values_are_known():
-    config = ReleaseConfig(current_version=Version("26.1"), release_date=datetime.date(2026, 5, 20))
-    config.require("release_date")
-
-
-class _FakeMilestone:
-    def __init__(self, title, due_on):
-        self.title = title
-        self.due_on = due_on
-
-
-class _FakeRepo:
-    def __init__(self, milestones):
-        self._milestones = milestones
-
-    def get_milestones(self, state):
-        return self._milestones
-
-
-class _FakeGithub:
-    def __init__(self, repo):
-        self._repo = repo
-
-    def get_repo(self, name):
-        return self._repo
-
-
-def test_unparsable_milestone_titles_are_ignored(monkeypatch):
-    repo = _FakeRepo(
-        [
-            _FakeMilestone("Backlog", None),
-            _FakeMilestone("26.1", datetime.datetime(2026, 5, 20)),
-        ]
-    )
-    monkeypatch.setattr(release_config, "github_client", lambda: _FakeGithub(repo))
-    assert real_milestone_due_dates("galaxyproject", "galaxy") == {Version("26.1"): datetime.date(2026, 5, 20)}
+def test_milestone_without_a_due_date_maps_to_none():
+    assert due_dates_by_version([_milestone("26.1")]) == {Version("26.1"): None}
 
 
 def test_milestone_lookup_failure_is_not_fatal(monkeypatch, capsys):
+    """A missing token must degrade to local resolution, not abort the release."""
+
     def _raise():
         raise RuntimeError("no GitHub auth configured")
 
     monkeypatch.setattr(release_config, "github_client", _raise)
-    assert real_milestone_due_dates("galaxyproject", "galaxy") == {}
+    assert release_config.milestone_due_dates("galaxyproject", "galaxy") == {}
     assert "Warning: could not read milestones" in capsys.readouterr().err
+
+
+# Resolving a release against the milestones ------------------------------------
+
+
+def test_release_date_is_the_due_date_of_its_own_milestone():
+    config = _config()
+    resolve_from_milestones(config, GALAXY_MILESTONES)
+    assert config.release_date == datetime.date(2026, 7, 30)
+
+
+def test_surrounding_versions_are_the_neighbouring_milestones():
+    config = _config()
+    resolve_from_milestones(config, {Version(v): None for v in ("24.0", "25.1", "26.0", "26.2", "27.0")})
+    assert config.previous_version == Version("26.0")
+    assert config.next_version == Version("26.2")
+
+
+def test_values_already_set_survive_the_milestones():
+    config = _config(release_date=datetime.date(2026, 6, 1), next_version=Version("27.0"))
+    resolve_from_milestones(config, GALAXY_MILESTONES)
+    assert config.release_date == datetime.date(2026, 6, 1)
+    assert config.next_version == Version("27.0")
+    assert config.previous_version == Version("26.0")  # the remaining gap is still filled
+
+
+def test_release_date_stays_unknown_when_its_milestone_has_no_due_date():
+    config = _config()
+    resolve_from_milestones(config, {Version("26.1"): None, Version("26.0"): datetime.date(2026, 1, 27)})
+    assert config.release_date is None
+    assert config.previous_version == Version("26.0")
+
+
+def test_nothing_is_invented_when_there_are_no_milestones():
+    config = _config()
+    resolve_from_milestones(config, {})
+    assert (config.release_date, config.previous_version, config.next_version) == (None, None, None)
+
+
+# What a command is allowed to demand -------------------------------------------
+
+
+def test_require_names_the_missing_flags_and_the_repository():
+    config = _config(owner="mvdbeek", repo="galaxy-fork")
+    with pytest.raises(ValueError) as excinfo:
+        config.require("release_date", "freeze_date")
+    assert "--release-date, --freeze-date" in str(excinfo.value)
+    assert "mvdbeek/galaxy-fork" in str(excinfo.value)
+
+
+def test_require_accepts_a_resolved_value():
+    _config(release_date=datetime.date(2026, 7, 30)).require("release_date")
+
+
+# Falling back when GitHub is unreachable ---------------------------------------
+
+
+@pytest.fixture
+def offline(monkeypatch):
+    """Every milestone lookup comes up empty, as it would with no network."""
+    monkeypatch.setattr(release_config, "milestone_due_dates", lambda owner, repo: {})
+
+
+def test_previous_version_falls_back_to_the_documented_releases(tmp_path, offline):
+    releases = tmp_path / "doc" / "source" / "releases"
+    releases.mkdir(parents=True)
+    for name in ("24.2.rst", "25.1.rst", "26.0.rst", "26.1_announce.rst", "index.rst"):
+        (releases / name).write_text("")
+    config = load_release_config(tmp_path, Version("26.1"))
+    assert config.previous_version == Version("26.0")
+
+
+def test_next_version_falls_back_to_the_next_minor(tmp_path, offline):
+    config = load_release_config(tmp_path, Version("26.1"))
+    assert config.next_version == Version("26.2")
+
+
+def test_release_date_has_no_fallback(tmp_path, offline):
+    """Nothing on disk records it, so the command must ask for it rather than guess."""
+    config = load_release_config(tmp_path, Version("26.1"))
+    assert config.release_date is None
+
+
+def test_milestones_are_not_read_when_the_flags_cover_everything(tmp_path, monkeypatch):
+    def _explode(owner, repo):
+        raise AssertionError("milestones were read despite every value being supplied")
+
+    monkeypatch.setattr(release_config, "milestone_due_dates", _explode)
+    load_release_config(
+        tmp_path,
+        Version("26.1"),
+        previous_version=Version("26.0"),
+        next_version=Version("26.2"),
+        release_date=datetime.date(2026, 7, 30),
+    )

@@ -1,5 +1,4 @@
 import datetime
-import os
 from pathlib import Path
 
 import pytest
@@ -17,7 +16,9 @@ from galaxy_release_util.bootstrap_history import (
     create_release_issue,
 )
 
-MILESTONES = {
+TEST_DATA = Path(".") / "tests" / "test_data"
+
+UPSTREAM_MILESTONES = {
     Version("98.1"): datetime.date(2098, 7, 15),
     Version("98.2"): datetime.date(2099, 1, 15),
     Version("99.0"): datetime.date(2099, 7, 15),
@@ -25,195 +26,152 @@ MILESTONES = {
 
 
 @pytest.fixture
-def release_files_dir():
-    return Path(".") / "tests" / "test_data"
+def expected():
+    """The release files as they should come out, keyed by name."""
+
+    def _read(name):
+        return (TEST_DATA / name).read_text()
+
+    return _read
 
 
 @pytest.fixture
-def announcement_file(release_files_dir):
-    with open(release_files_dir / "98.2_announce.rst") as f:
-        return f.read()
+def galaxy_root(tmp_path):
+    """A directory that satisfies the real verify_galaxy_root check."""
+    (tmp_path / "lib" / "galaxy" / "version").mkdir(parents=True)
+    (tmp_path / "lib" / "galaxy" / "version" / "__init__.py").write_text("")
+    (tmp_path / "doc" / "source" / "releases").mkdir(parents=True)
+    return tmp_path
 
 
 @pytest.fixture
-def user_announcement_file(release_files_dir):
-    with open(release_files_dir / "98.2_announce_user.rst") as f:
-        return f.read()
-
-
-@pytest.fixture
-def next_release_announcement_file(release_files_dir):
-    with open(release_files_dir / "99.0_announce.rst") as f:
-        return f.read()
-
-
-@pytest.fixture
-def prs_file(release_files_dir):
-    with open(release_files_dir / "98.2_prs.rst") as f:
-        return f.read()
+def releases_dir(galaxy_root):
+    return galaxy_root / "doc" / "source" / "releases"
 
 
 @pytest.fixture(autouse=True)
-def offline(monkeypatch):
-    """Never let the tests reach GitHub; milestones are stubbed per test instead."""
-    monkeypatch.setattr(bootstrap_history, "verify_galaxy_root", lambda x: None)
+def no_milestones(monkeypatch):
+    """Milestones come up empty unless a test says otherwise, so none of this hits GitHub."""
     monkeypatch.setattr(release_config, "milestone_due_dates", lambda owner, repo: {})
 
 
 @pytest.fixture
 def milestones(monkeypatch):
-    def _set(due_dates=MILESTONES):
-        monkeypatch.setattr(release_config, "milestone_due_dates", lambda owner, repo: due_dates)
+    """Publish milestones, either for every repository or per (owner, repo)."""
+
+    def _set(due_dates=UPSTREAM_MILESTONES, per_repo=None):
+        lookup = (lambda owner, repo: per_repo[(owner, repo)]) if per_repo else (lambda owner, repo: due_dates)
+        monkeypatch.setattr(release_config, "milestone_due_dates", lookup)
 
     return _set
 
 
-def test_create_changelog_from_milestones_only(
-    monkeypatch,
-    milestones,
-    announcement_file,
-    user_announcement_file,
-    prs_file,
-    next_release_announcement_file,
-):
-    """No config YAML, no date or version flags: the milestones supply everything."""
+@pytest.fixture
+def no_pr_scraping(monkeypatch):
+    """Skip the walk over every pull request GitHub has; the generated files are what matter."""
+    monkeypatch.setattr(bootstrap_history, "_load_prs", lambda *args, **kwargs: None)
+
+
+@pytest.mark.parametrize(
+    "extra_args",
+    [
+        pytest.param([], id="from-milestones"),
+        pytest.param(["--next-version", "99.0", "--release-date", "2099-01-15"], id="from-flags"),
+    ],
+)
+def test_create_changelog_writes_the_release_files(galaxy_root, releases_dir, milestones, no_pr_scraping, expected, extra_args):
     milestones()
-    monkeypatch.setattr(bootstrap_history, "_load_prs", lambda *args, **kwargs: None)
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(create_changelog, ["98.2"])
-        assert result.exit_code == 0, result.output
+    result = CliRunner().invoke(create_changelog, ["98.2", "--galaxy-root", str(galaxy_root), *extra_args])
+    assert result.exit_code == 0, result.output
 
-        releases_path = Path("doc") / "source" / "releases"
-        with open(releases_path / "98.2_announce.rst") as f:
-            assert f.read() == announcement_file
-        with open(releases_path / "98.2_announce_user.rst") as f:
-            assert f.read() == user_announcement_file
-        with open(releases_path / "98.2_prs.rst") as f:
-            assert f.read() == prs_file
-        with open(releases_path / "99.0_announce.rst") as f:
-            assert f.read() == next_release_announcement_file
+    for name in ("98.2_announce.rst", "98.2_announce_user.rst", "98.2_prs.rst", "99.0_announce.rst"):
+        assert (releases_dir / name).read_text() == expected(name)
 
 
-def test_create_changelog_from_flags(monkeypatch, announcement_file, next_release_announcement_file):
-    """Flags still work when the milestones are unavailable."""
-    monkeypatch.setattr(bootstrap_history, "_load_prs", lambda *args, **kwargs: None)
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(
-            create_changelog,
-            ["98.2", "--galaxy-root", ".", "--next-version", "99.0", "--release-date", "2099-01-15"],
-        )
-        assert result.exit_code == 0, result.output
-
-        releases_path = Path("doc") / "source" / "releases"
-        with open(releases_path / "98.2_announce.rst") as f:
-            assert f.read() == announcement_file
-        with open(releases_path / "99.0_announce.rst") as f:
-            assert f.read() == next_release_announcement_file
+def test_owner_and_repo_choose_which_milestones_are_read(galaxy_root, releases_dir, milestones, no_pr_scraping):
+    """A fork with a later 98.2 due date must produce a later date in the announcement."""
+    milestones(
+        per_repo={
+            ("galaxyproject", "galaxy"): UPSTREAM_MILESTONES,
+            ("mvdbeek", "galaxy-fork"): {Version("98.2"): datetime.date(2099, 6, 15), Version("99.0"): None},
+        }
+    )
+    result = CliRunner().invoke(
+        create_changelog,
+        ["98.2", "--galaxy-root", str(galaxy_root), "--owner", "mvdbeek", "--repo", "galaxy-fork"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "98.2 Galaxy Release (June 2099)" in (releases_dir / "98.2_announce.rst").read_text()
 
 
-def test_create_changelog_reads_milestones_of_the_given_repo(monkeypatch):
-    """--owner/--repo decide which milestones are consulted."""
-    seen = {}
-
-    def _record(owner, repo):
-        seen["target"] = (owner, repo)
-        return MILESTONES
-
-    monkeypatch.setattr(release_config, "milestone_due_dates", _record)
-    monkeypatch.setattr(bootstrap_history, "_load_prs", lambda *args, **kwargs: None)
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(create_changelog, ["98.2", "--owner", "mvdbeek", "--repo", "galaxy-fork"])
-        assert result.exit_code == 0, result.output
-        assert seen["target"] == ("mvdbeek", "galaxy-fork")
+def test_create_changelog_reports_an_unresolvable_release_date(galaxy_root):
+    result = CliRunner().invoke(create_changelog, ["98.2", "--galaxy-root", str(galaxy_root)])
+    assert result.exit_code != 0
+    assert "--release-date" in result.output
+    assert "milestone titled '98.2'" in result.output
 
 
-def test_create_changelog_reports_unresolvable_release_date():
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(create_changelog, ["98.2"])
-        assert result.exit_code != 0
-        assert "--release-date" in result.output
-        assert "milestone titled '98.2'" in result.output
-
-
-def test_create_changelog_does_not_ask_for_unused_values(milestones):
-    """previous-version and freeze-date are irrelevant here and must not be options."""
-    milestones()
-    runner = CliRunner()
-    result = runner.invoke(create_changelog, ["--help"])
+def test_create_changelog_does_not_ask_for_values_it_never_reads():
+    """The bug this guards: create-changelog demanded a previous version and a freeze date."""
+    result = CliRunner().invoke(create_changelog, ["--help"])
     assert result.exit_code == 0
     assert "--previous-version" not in result.output
     assert "--freeze-date" not in result.output
 
 
-def test_create_changelog_dry_run(milestones):
+def test_create_changelog_dry_run_writes_files_but_skips_github(galaxy_root, releases_dir, milestones):
     milestones()
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(create_changelog, ["98.2", "--dry-run"])
-        assert result.exit_code == 0, result.output
-        assert "Dry run: skipping GitHub API call" in result.output
+    result = CliRunner().invoke(create_changelog, ["98.2", "--galaxy-root", str(galaxy_root), "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "Dry run: skipping GitHub API call" in result.output
+    assert (releases_dir / "98.2_announce.rst").exists()
 
 
-def test_check_blocking_prs_dry_run(milestones):
+def test_check_blocking_prs_dry_run_reports_the_resolved_date(galaxy_root, milestones):
     milestones()
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(check_blocking_prs, ["98.2", "--dry-run"])
-        assert result.exit_code == 0, result.output
-        assert "Dry run: would check blocking PRs" in result.output
-        assert "2099-01-15" in result.output
+    result = CliRunner().invoke(check_blocking_prs, ["98.2", "--galaxy-root", str(galaxy_root), "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "2099-01-15" in result.output
 
 
-def test_check_blocking_issues_dry_run():
-    """Blocking issues are selected by milestone alone, so no dates are needed."""
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(check_blocking_issues, ["98.2", "--dry-run"])
-        assert result.exit_code == 0, result.output
-        assert "Dry run: would check blocking issues" in result.output
+def test_check_blocking_issues_needs_no_dates(galaxy_root):
+    """Issues are selected by milestone alone, so the empty milestone lookup must not matter."""
+    result = CliRunner().invoke(check_blocking_issues, ["98.2", "--galaxy-root", str(galaxy_root), "--dry-run"])
+    assert result.exit_code == 0, result.output
+    assert "Dry run: would check blocking issues" in result.output
 
 
-def test_create_release_issue_from_milestones(milestones):
-    """Only the freeze date, which no milestone records, has to be supplied."""
+def test_create_release_issue_needs_only_the_freeze_date(galaxy_root, milestones):
     milestones()
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(create_release_issue, ["98.2", "--freeze-date", "2098-12-01", "--dry-run"])
-        assert result.exit_code == 0, result.output
-        assert "Freeze Release (on or around 2098-12-01)" in result.output
-        assert "`99.0` for next release" in result.output
+    result = CliRunner().invoke(
+        create_release_issue,
+        ["98.2", "--galaxy-root", str(galaxy_root), "--freeze-date", "2098-12-01", "--dry-run"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Freeze Release (on or around 2098-12-01)" in result.output
+    assert "`99.0` for next release" in result.output  # next version, from the milestones
+    assert "release_98.1" in result.output  # previous version, from the milestones
 
 
-def test_create_release_issue_rejects_invalid_next_version(milestones):
+def test_create_release_issue_rejects_a_next_version_that_precedes_the_release(galaxy_root, milestones):
     milestones()
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(
-            create_release_issue,
-            ["98.2", "--next-version", "98.0", "--freeze-date", "2098-12-01", "--dry-run"],
-        )
-        assert result.exit_code != 0
-        assert "--next-version (98.0) must be greater than release version (98.2)" in result.output
+    result = CliRunner().invoke(
+        create_release_issue,
+        ["98.2", "--galaxy-root", str(galaxy_root), "--next-version", "98.0", "--freeze-date", "2098-12-01", "--dry-run"],
+    )
+    assert result.exit_code != 0
+    assert "--next-version (98.0) must be greater than release version (98.2)" in result.output
 
 
-def test_create_release_issue_reports_missing_freeze_date(milestones):
+def test_create_release_issue_reports_a_missing_freeze_date(galaxy_root, milestones):
     milestones()
-    runner = CliRunner()
-    with runner.isolated_filesystem():
-        os.makedirs("doc/source/releases")
-        result = runner.invoke(create_release_issue, ["98.2", "--dry-run"])
-        assert result.exit_code != 0
-        assert "--freeze-date" in result.output
+    result = CliRunner().invoke(create_release_issue, ["98.2", "--galaxy-root", str(galaxy_root), "--dry-run"])
+    assert result.exit_code != 0
+    assert "--freeze-date" in result.output
+
+
+def test_galaxy_root_is_verified(tmp_path):
+    """An empty directory is not a Galaxy checkout."""
+    result = CliRunner().invoke(create_changelog, ["98.2", "--galaxy-root", str(tmp_path)])
+    assert result.exit_code != 0
+    assert "Galaxy files not found" in str(result.exception)
