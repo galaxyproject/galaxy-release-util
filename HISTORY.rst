@@ -5,14 +5,15 @@ History
 
 
 ------------------
+0.3.4 (30-07-2026)
+------------------
+* Fix referenced paths after galaxy code restructure by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/50
+* Check for existing tag before creating it in create-point-release by @jdavcs in https://github.com/galaxyproject/galaxy-release-util/pull/51
+* Fix config helper naming by @guerler in https://github.com/galaxyproject/galaxy-release-util/pull/48
+
+------------------
 0.3.3 (22-05-2026)
 ------------------
-* Don't add ``requirements.txt`` to ``meta_package.modified_paths`` by @nsoranzo in https://github.com/galaxyproject/galaxy-release-util/pull/39
-* Changes to Release Issue Template by @ahmedhamidawan in https://github.com/galaxyproject/galaxy-release-util/pull/33
-* Restructure release notes to account for GitHub notes by @ahmedhamidawan in https://github.com/galaxyproject/galaxy-release-util/pull/40
-* Remove the "plus one week" timeframe separation between freezing and branching by @ahmedhamidawan in https://github.com/galaxyproject/galaxy-release-util/pull/41
-* Add Release Manager Task Instructions by @guerler in https://github.com/galaxyproject/galaxy-release-util/pull/42
-* Update galaxy-client dependency version during point releases by @dannon in https://github.com/galaxyproject/galaxy-release-util/pull/43
 * Add release config YAML and extend CLI flags by @guerler in https://github.com/galaxyproject/galaxy-release-util/pull/44
 
 ------------------
