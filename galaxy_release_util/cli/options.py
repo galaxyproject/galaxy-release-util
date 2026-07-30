@@ -49,37 +49,44 @@ class ClickDate(click.ParamType):
             self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)
 
 
-release_config_option = click.option(
-    "--release-config",
-    type=click.Path(exists=True, path_type=pathlib.Path),
-    default=None,
-    help="Path to release config YAML. Default: {galaxy-root}/doc/source/releases/{version}_release.yml",
+owner_option = click.option(
+    "--owner",
+    default="galaxyproject",
+    show_default=True,
+    help="GitHub organization or user owning the repository. Set when working against a fork.",
+)
+
+repo_option = click.option(
+    "--repo",
+    default="galaxy",
+    show_default=True,
+    help="GitHub repository name. Set when working against a fork.",
 )
 
 previous_version_option = click.option(
     "--previous-version",
     type=ClickVersion(),
     default=None,
-    help="Previous release version (overrides config YAML).",
+    help="Previous release version. Defaults to the newest milestone preceding the release version.",
 )
 
 next_version_option = click.option(
     "--next-version",
     type=ClickVersion(),
     default=None,
-    help="Next planned release version (required for create-release-issue and create-changelog). The first release of a year is YY.0; subsequent releases increment the minor version.",
+    help="Next planned release version. Defaults to the oldest milestone following the release version.",
 )
 
 release_date_option = click.option(
     "--release-date",
     type=ClickDate(),
     default=None,
-    help="Release date in YYYY-MM-DD format (overrides config YAML).",
+    help="Release date in YYYY-MM-DD format. Defaults to the due date of the release version's milestone.",
 )
 
 freeze_date_option = click.option(
     "--freeze-date",
     type=ClickDate(),
     default=None,
-    help="Freeze date in YYYY-MM-DD format (overrides config YAML).",
+    help="Freeze date in YYYY-MM-DD format. Not derivable from milestones, so it must be supplied.",
 )

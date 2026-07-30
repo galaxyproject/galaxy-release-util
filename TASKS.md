@@ -16,6 +16,8 @@ This document provides a step by step guide for preparing a Galaxy release. It c
 
 Discuss and agree on a tentative freeze date (FREEZE_DATE) and anticipated release date (RELEASE_DATE) with the team during a dev meeting. These dates are provisional until confirmed at the Freeze Meeting.
 
+RELEASE_DATE is recorded as the due date of the release milestone in Step 6, which is where `galaxy-release-util` reads it from. Whenever the date moves, update the milestone; nothing else needs changing.
+
 ---
 
 ### Step 2: Announce Freeze Meeting
@@ -115,28 +117,29 @@ export GITHUB_AUTH=<TOKEN>
 
 ---
 
-### Step 6: Create Release Config YAML
+### Step 6: Create the GitHub Milestone
 
-All release metadata is defined in a single YAML config file. Once committed, all `galaxy-release-util` commands load it automatically from the default path given a release version.
+GitHub milestones are the source of truth for release metadata. `galaxy-release-util` reads them to work out:
 
-1. Change to your Galaxy root directory:
+* RELEASE_DATE, from the due date of the milestone named after RELEASE_TAG
+* PREVIOUS_RELEASE_TAG, the newest milestone preceding RELEASE_TAG
+* NEXT_RELEASE_TAG, the oldest milestone following RELEASE_TAG
+
+So the only setup required is a [milestone](https://github.com/galaxyproject/galaxy/milestones) titled `<RELEASE_TAG>` with its due date set to RELEASE_DATE. Nothing has to be committed to the Galaxy repository, and no command needs the dates passed on the command line.
+
+Open and closed milestones are both read, so PREVIOUS_RELEASE_TAG resolves from an already-closed milestone and the release notes can still be regenerated after RELEASE_TAG's own milestone is closed.
+
+Any value can still be overridden with a flag, for example `--release-date 2026-02-17` or `--next-version 26.2`. FREEZE_DATE is not recorded anywhere on GitHub, so `create-release-issue` takes it as `--freeze-date`.
+
+If GitHub cannot be reached, commands print a warning rather than failing: NEXT_RELEASE_TAG falls back to the next minor version and PREVIOUS_RELEASE_TAG to the newest release under `doc/source/releases`. RELEASE_DATE has no fallback, so a command that needs it will tell you to pass `--release-date`.
+
+#### Working against a fork
+
+Commands read `galaxyproject/galaxy` by default. Pass `--owner` and `--repo` to point them at a fork or private repository; this also decides which milestones are read:
 
 ```bash
-cd <GALAXY_ROOT>
+galaxy-release-util create-changelog <RELEASE_TAG> --owner <OWNER> --repo <REPO>
 ```
-
-2. Create the release config file at `doc/source/releases/<RELEASE_TAG>_release.yml`:
-
-```yaml
-current-version: "<RELEASE_TAG>"
-previous-version: "<PREVIOUS_RELEASE_TAG>"
-freeze-date: "<FREEZE_DATE>"
-release-date: "<RELEASE_DATE>"
-```
-
-All fields are required. The `freeze-date` and `release-date` values must use `YYYY-MM-DD` format. Two optional fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` respectively. Override them only when working with a private or forked repository. The `next-version` value is provided via the `--next-version` CLI flag on commands that require it (e.g. `create-release-issue`, `create-changelog`).
-
-3. Commit this file to the repository so it is available for all subsequent release commands.
 
 ---
 
@@ -155,10 +158,10 @@ cd <GALAXY_ROOT>
 3. Review the generated release issue content:
 
 ```bash
-galaxy-release-util create-release-issue <RELEASE_TAG> --galaxy-root . --next-version <NEXT_RELEASE_TAG> --dry-run
+galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date <FREEZE_DATE> --dry-run
 ```
 
-To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
+Everything else is read from the milestones.
 
 4. Re run the command without `--dry-run` to open the issue on GitHub.
 
