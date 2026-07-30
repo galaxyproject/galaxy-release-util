@@ -16,6 +16,8 @@ This document provides a step by step guide for preparing a Galaxy release. It c
 
 Discuss and agree on a tentative freeze date (FREEZE_DATE) and anticipated release date (RELEASE_DATE) with the team during a dev meeting. These dates are provisional until confirmed at the Freeze Meeting.
 
+RELEASE_DATE is recorded as the due date of the release milestone in Step 6, which is where `galaxy-release-util` reads it from. Whenever the date moves, update the milestone; nothing else needs changing.
+
 ---
 
 ### Step 2: Announce Freeze Meeting
@@ -125,7 +127,11 @@ GitHub milestones are the source of truth for release metadata. `galaxy-release-
 
 So the only setup required is a [milestone](https://github.com/galaxyproject/galaxy/milestones) titled `<RELEASE_TAG>` with its due date set to RELEASE_DATE. Nothing has to be committed to the Galaxy repository, and no command needs the dates passed on the command line.
 
+Open and closed milestones are both read, so PREVIOUS_RELEASE_TAG resolves from an already-closed milestone and the release notes can still be regenerated after RELEASE_TAG's own milestone is closed.
+
 Any value can still be overridden with a flag, for example `--release-date 2026-02-17` or `--next-version 26.2`. FREEZE_DATE is not recorded anywhere on GitHub, so `create-release-issue` takes it as `--freeze-date`.
+
+If GitHub cannot be reached, commands print a warning rather than failing: NEXT_RELEASE_TAG falls back to the next minor version and PREVIOUS_RELEASE_TAG to the newest release under `doc/source/releases`. RELEASE_DATE has no fallback, so a command that needs it will tell you to pass `--release-date`.
 
 #### Working against a fork
 

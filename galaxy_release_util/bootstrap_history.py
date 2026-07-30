@@ -198,7 +198,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 - [ ] **Freeze Release (on or around ${freeze_date})**
 
     - [ ] Verify that your installed version of `galaxy-release-util` is up-to-date.
-    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release. Note the milestone number from the URL (`https://github.com/galaxyproject/galaxy/milestone/<NUMBER>`).
+    - [ ] [Create milestone](https://github.com/galaxyproject/galaxy/milestones) `${next_version}` for next release and **set its due date** to the planned release date. `galaxy-release-util` reads that due date as the release date for `${next_version}`, so leaving it empty will block the next release's changelog. Note the milestone number from the URL (`https://github.com/galaxyproject/galaxy/milestone/<NUMBER>`).
     - [ ] Update ``MILESTONE_NUMBER`` in the [maintenance bot](https://github.com/galaxyproject/galaxy/blob/dev/.github/workflows/maintenance_bot.yaml) to reference `${next_version}` so it properly tags new pull requests. Open a pull request to apply the change.
     - [ ] Hold the Freeze Meeting (one week before freeze, usually during a weekly dev meeting). Review [open milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3Akind%2Fbug+-is%3Adraft), decide what will be included in `${version}`, and assign reviewers to ensure merges complete before the freeze.
     - [ ] Audit milestone labels. Ensure all open pull requests in the milestone have appropriate `kind/*` labels and correct milestone assignment. [Find unlabeled PRs](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}+-label%3A%22kind%2Ffeature%22+-label%3A%22kind%2Fbug%22+-label%3A%22kind%2Fenhancement%22+-label%3A%22kind%2Frefactoring%22+-label%3Adependencies).
@@ -325,7 +325,11 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Bootstrap the release notes
 
           galaxy-release-util create-changelog ${version}
-    - [ ] Open newly created files and manually curate major topics and release notes.
+
+      Run this from the Galaxy root. The release date and `${next_version}` are read from the milestones; pass `--release-date` or `--next-version` to override either.
+
+      Note: each run rewrites ``${version}_announce.rst`` from the template. ``${version}_announce_user.rst``, ``${version}_prs.rst`` and the ``${next_version}`` stub are preserved and only gain newly merged pull requests, so re-running to pick up new pull requests costs you only the admin-facing file.
+    - [ ] Open newly created files and manually curate major topics and release notes. Leave the admin notes in ``${version}_announce.rst`` until after the final re-run below, or keep them elsewhere until then.
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
     - [ ] Open a pull request for the release notes branch.
@@ -355,6 +359,8 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
           galaxy-release-util create-changelog ${version}
+
+      This rewrites ``${version}_announce.rst`` from the template again, so re-apply the admin notes afterwards.
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
 
@@ -377,7 +383,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
 - [ ] **Complete release**
 
-    - [ ] Close milestone ``${version}`` and ensure milestone ``${next_version}`` exists.
+    - [ ] Close milestone ``${version}`` and ensure milestone ``${next_version}`` exists with its due date set. Closing ``${version}`` is safe: milestones are read regardless of state, so the ``${version}`` release notes can still be regenerated afterwards.
     - [ ] Close this issue.
 """  # noqa: E501
 )
