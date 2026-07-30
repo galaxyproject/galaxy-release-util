@@ -38,7 +38,11 @@ from .metadata import (
     get_repo_name,
     strip_release,
 )
-from .release_config import load_release_config
+from .release_config import (
+    ReleaseConfig,
+    load_release_config,
+    load_repo_owner,
+)
 from .util import (
     escape_rst_inline,
     verify_galaxy_root,
@@ -320,7 +324,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
           git checkout release_${version} -b ${version}_release_notes
     - [ ] Bootstrap the release notes
 
-          galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
+          galaxy-release-util create-changelog ${version}
     - [ ] Open newly created files and manually curate major topics and release notes.
     - [ ] Run ``python scripts/release-diff.py release_${previous_version}`` and add configuration changes to release notes.
     - [ ] Add new release to doc/source/releases/index.rst
@@ -342,15 +346,15 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Ensure all [blocking milestone issues](https://github.com/galaxyproject/galaxy/issues?q=is%3Aopen+is%3Aissue+milestone%3A${version}) have been resolved.
 
-          galaxy-release-util check-blocking-issues ${version} --galaxy-root .
+          galaxy-release-util check-blocking-issues ${version}
     - [ ] Ensure all [blocking milestone pull requests](https://github.com/galaxyproject/galaxy/pulls?q=is%3Aopen+is%3Apr+milestone%3A${version}) have been merged, closed, or postponed until the next release.
 
-          galaxy-release-util check-blocking-prs ${version} --galaxy-root .
+          galaxy-release-util check-blocking-prs ${version}
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze have [milestones attached](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+no%3Amilestone)
     - [ ] Ensure all pull requests merged into the pre-release branch during the freeze are not in the [${next_version} milestone](https://github.com/galaxyproject/galaxy/pulls?q=is%3Apr+is%3Aclosed+base%3Arelease_${version}+is%3Amerged+milestone%3A${next_version})
     - [ ] Ensure release notes include all pull requests added during the freeze by re-running the release note bootstrapping:
 
-          galaxy-release-util create-changelog ${version} --galaxy-root . --next-version ${next_version}
+          galaxy-release-util create-changelog ${version}
     - [ ] Ensure previous release is merged into current. [GitHub branch comparison](https://github.com/galaxyproject/galaxy/compare/release_${version}...release_${previous_version})
     - [ ] Create the first point release (v${version}.0) using the instructions at https://docs.galaxyproject.org/en/master/dev/create_release.html#creating-galaxy-point-releases
 
@@ -381,8 +385,22 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 release_version_argument = click.argument("release-version", type=ClickVersion())
 
 dry_run_option = click.option(
-    "--dry-run", is_flag=True, default=False, help="Do not connect to GitHub's API, print out output"
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print what would happen instead of opening issues or collecting pull requests.",
 )
+
+
+def _resolve_config(*required: str, **kwargs) -> ReleaseConfig:
+    """Resolve the release config and assert that the values this command needs are known."""
+    try:
+        config = load_release_config(**kwargs)
+        config.require(*required)
+    except (ValueError, FileNotFoundError) as e:
+        raise click.UsageError(str(e)) from e
+    return config
+
 
 @click.group(help="Subcommands of this script can perform various tasks around creating Galaxy releases")
 def cli():
@@ -411,14 +429,24 @@ def create_release_issue(
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(
-        galaxy_root, release_version, release_config,
-        previous_version, next_version, release_date, freeze_date,
+    config = _resolve_config(
+        "previous_version",
+        "next_version",
+        "release_date",
+        "freeze_date",
+        galaxy_root=galaxy_root,
+        release_version=release_version,
+        release_config_path=release_config,
+        previous_version=previous_version,
+        next_version=next_version,
+        release_date=release_date,
+        freeze_date=freeze_date,
     )
-    if config.next_version is None:
-        raise click.UsageError("--next-version is required for create-release-issue")
+    assert config.next_version
     if config.next_version <= config.current_version:
-        raise click.UsageError(f"--next-version ({config.next_version}) must be greater than release version ({config.current_version})")
+        raise click.UsageError(
+            f"--next-version ({config.next_version}) must be greater than release version ({config.current_version})"
+        )
 
     issue_template_params = dict(
         version=release_version,
@@ -454,29 +482,29 @@ def create_release_issue(
     release_version_argument,
     galaxy_root_option,
     release_config_option,
-    previous_version_option,
     next_version_option,
     release_date_option,
-    freeze_date_option,
     dry_run_option,
 )
 def create_changelog(
     release_version: Version,
     galaxy_root: Path,
     release_config: Optional[Path],
-    previous_version: Optional[Version],
     next_version: Optional[Version],
     release_date: Optional[datetime.date],
-    freeze_date: Optional[datetime.date],
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(
-        galaxy_root, release_version, release_config,
-        previous_version, next_version, release_date, freeze_date,
+    config = _resolve_config(
+        "release_date",
+        "next_version",
+        galaxy_root=galaxy_root,
+        release_version=release_version,
+        release_config_path=release_config,
+        next_version=next_version,
+        release_date=release_date,
     )
-    if config.next_version is None:
-        raise click.UsageError("--next-version is required for create-changelog")
+    assert config.release_date and config.next_version
     release_date = config.release_date
     next_version = config.next_version
 
@@ -517,27 +545,30 @@ def create_changelog(
     release_version_argument,
     galaxy_root_option,
     release_config_option,
-    previous_version_option,
     release_date_option,
-    freeze_date_option,
     dry_run_option,
 )
 def check_blocking_prs(
     release_version: Version,
     galaxy_root: Path,
     release_config: Optional[Path],
-    previous_version: Optional[Version],
     release_date: Optional[datetime.date],
-    freeze_date: Optional[datetime.date],
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(
-        galaxy_root, release_version, release_config,
-        previous_version, None, release_date, freeze_date,
+    config = _resolve_config(
+        "release_date",
+        galaxy_root=galaxy_root,
+        release_version=release_version,
+        release_config_path=release_config,
+        release_date=release_date,
     )
+    assert config.release_date
     if dry_run:
-        click.echo(f"Dry run: would check blocking PRs for milestone {release_version}")
+        click.echo(
+            f"Dry run: would check blocking PRs for milestone {release_version} "
+            f"(release date {config.release_date})"
+        )
         sys.exit(0)
     block = 0
     for pr in _get_prs(release_version, config.release_date, config.owner, config.repo, state="open"):
@@ -551,31 +582,23 @@ def check_blocking_prs(
     release_version_argument,
     galaxy_root_option,
     release_config_option,
-    previous_version_option,
-    release_date_option,
-    freeze_date_option,
     dry_run_option,
 )
 def check_blocking_issues(
     release_version: Version,
     galaxy_root: Path,
     release_config: Optional[Path],
-    previous_version: Optional[Version],
-    release_date: Optional[datetime.date],
-    freeze_date: Optional[datetime.date],
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    config = load_release_config(
-        galaxy_root, release_version, release_config,
-        previous_version, None, release_date, freeze_date,
-    )
+    # Issues are selected by milestone alone, so the repository name is all we need.
+    owner, repo_name = load_repo_owner(galaxy_root, release_version, release_config)
     if dry_run:
         click.echo(f"Dry run: would check blocking issues for milestone {release_version}")
         sys.exit(0)
     block = 0
     github = github_client()
-    repo = github.get_repo(get_repo_name(config.owner, config.repo))
+    repo = github.get_repo(get_repo_name(owner, repo_name))
     issues = repo.get_issues(state="open")
     for issue in issues:
         if (
