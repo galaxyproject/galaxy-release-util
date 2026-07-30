@@ -29,7 +29,8 @@ from .cli.options import (
     ClickVersion,
     galaxy_root_option,
     group_options,
-    release_config_option,
+    owner_option,
+    repo_option,
 )
 from .github_client import github_client
 from .metadata import (
@@ -39,7 +40,6 @@ from .metadata import (
     get_repo_name,
     strip_release,
 )
-from .release_config import load_repo_owner
 from .util import (
     escape_rst_inline,
     verify_galaxy_root,
@@ -690,7 +690,7 @@ def build_and_upload(
 @click.option("--build-packages/--no-build-packages", type=bool, is_flag=True, default=True)
 @click.option("--upload-packages", type=bool, is_flag=True, default=False)
 @click.option("--upstream", type=str, default=None, help="Git upstream URL. Default: git@github.com:{owner}/{repo}.git")
-@group_options(release_config_option, packages_option, no_confirm_option)
+@group_options(owner_option, repo_option, packages_option, no_confirm_option)
 def create_point_release(
     galaxy_root: Path,
     new_version: Version,
@@ -700,10 +700,10 @@ def create_point_release(
     upload_packages: bool,
     no_confirm: bool,
     upstream: Optional[str],
-    release_config: Optional[Path],
+    owner: str,
+    repo: str,
 ):
     verify_galaxy_root(galaxy_root)
-    owner, repo = load_repo_owner(galaxy_root, new_version, release_config)
     if upstream is None:
         upstream = f"git@github.com:{get_repo_name(owner, repo)}.git"
     check_galaxy_repo_is_clean(galaxy_root)

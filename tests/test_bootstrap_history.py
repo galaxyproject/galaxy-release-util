@@ -115,18 +115,22 @@ def test_create_changelog_from_flags(monkeypatch, announcement_file, next_releas
             assert f.read() == next_release_announcement_file
 
 
-def test_create_changelog_from_config_yaml(monkeypatch, announcement_file):
+def test_create_changelog_reads_milestones_of_the_given_repo(monkeypatch):
+    """--owner/--repo decide which milestones are consulted."""
+    seen = {}
+
+    def _record(owner, repo):
+        seen["target"] = (owner, repo)
+        return MILESTONES
+
+    monkeypatch.setattr(release_config, "milestone_due_dates", _record)
     monkeypatch.setattr(bootstrap_history, "_load_prs", lambda *args, **kwargs: None)
     runner = CliRunner()
     with runner.isolated_filesystem():
         os.makedirs("doc/source/releases")
-        Path("doc/source/releases/98.2_release.yml").write_text(
-            "current-version: '98.2'\nrelease-date: '2099-01-15'\nnext-version: '99.0'\n"
-        )
-        result = runner.invoke(create_changelog, ["98.2"])
+        result = runner.invoke(create_changelog, ["98.2", "--owner", "mvdbeek", "--repo", "galaxy-fork"])
         assert result.exit_code == 0, result.output
-        with open(Path("doc") / "source" / "releases" / "98.2_announce.rst") as f:
-            assert f.read() == announcement_file
+        assert seen["target"] == ("mvdbeek", "galaxy-fork")
 
 
 def test_create_changelog_reports_unresolvable_release_date():

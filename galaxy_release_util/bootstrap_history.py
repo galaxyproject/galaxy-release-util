@@ -24,9 +24,10 @@ from .cli.options import (
     galaxy_root_option,
     group_options,
     next_version_option,
+    owner_option,
     previous_version_option,
-    release_config_option,
     release_date_option,
+    repo_option,
 )
 from .github_client import github_client
 from .metadata import (
@@ -41,7 +42,6 @@ from .metadata import (
 from .release_config import (
     ReleaseConfig,
     load_release_config,
-    load_repo_owner,
 )
 from .util import (
     escape_rst_inline,
@@ -411,7 +411,8 @@ def cli():
 @group_options(
     release_version_argument,
     galaxy_root_option,
-    release_config_option,
+    owner_option,
+    repo_option,
     previous_version_option,
     next_version_option,
     release_date_option,
@@ -421,7 +422,8 @@ def cli():
 def create_release_issue(
     release_version: Version,
     galaxy_root: Path,
-    release_config: Optional[Path],
+    owner: str,
+    repo: str,
     previous_version: Optional[Version],
     next_version: Optional[Version],
     release_date: Optional[datetime.date],
@@ -436,7 +438,8 @@ def create_release_issue(
         "freeze_date",
         galaxy_root=galaxy_root,
         release_version=release_version,
-        release_config_path=release_config,
+        owner=owner,
+        repo=repo,
         previous_version=previous_version,
         next_version=next_version,
         release_date=release_date,
@@ -464,8 +467,8 @@ def create_release_issue(
         return None
     try:
         github = github_client()
-        repo = github.get_repo(get_repo_name(config.owner, config.repo))
-        release_issue = repo.create_issue(
+        github_repo = github.get_repo(get_repo_name(config.owner, config.repo))
+        release_issue = github_repo.create_issue(
             title=issue_title,
             body=issue_contents,
         )
@@ -481,7 +484,8 @@ def create_release_issue(
 @group_options(
     release_version_argument,
     galaxy_root_option,
-    release_config_option,
+    owner_option,
+    repo_option,
     next_version_option,
     release_date_option,
     dry_run_option,
@@ -489,7 +493,8 @@ def create_release_issue(
 def create_changelog(
     release_version: Version,
     galaxy_root: Path,
-    release_config: Optional[Path],
+    owner: str,
+    repo: str,
     next_version: Optional[Version],
     release_date: Optional[datetime.date],
     dry_run: bool,
@@ -500,7 +505,8 @@ def create_changelog(
         "next_version",
         galaxy_root=galaxy_root,
         release_version=release_version,
-        release_config_path=release_config,
+        owner=owner,
+        repo=repo,
         next_version=next_version,
         release_date=release_date,
     )
@@ -544,14 +550,16 @@ def create_changelog(
 @group_options(
     release_version_argument,
     galaxy_root_option,
-    release_config_option,
+    owner_option,
+    repo_option,
     release_date_option,
     dry_run_option,
 )
 def check_blocking_prs(
     release_version: Version,
     galaxy_root: Path,
-    release_config: Optional[Path],
+    owner: str,
+    repo: str,
     release_date: Optional[datetime.date],
     dry_run: bool,
 ):
@@ -560,7 +568,8 @@ def check_blocking_prs(
         "release_date",
         galaxy_root=galaxy_root,
         release_version=release_version,
-        release_config_path=release_config,
+        owner=owner,
+        repo=repo,
         release_date=release_date,
     )
     assert config.release_date
@@ -581,25 +590,26 @@ def check_blocking_prs(
 @group_options(
     release_version_argument,
     galaxy_root_option,
-    release_config_option,
+    owner_option,
+    repo_option,
     dry_run_option,
 )
 def check_blocking_issues(
     release_version: Version,
     galaxy_root: Path,
-    release_config: Optional[Path],
+    owner: str,
+    repo: str,
     dry_run: bool,
 ):
     verify_galaxy_root(galaxy_root)
-    # Issues are selected by milestone alone, so the repository name is all we need.
-    owner, repo_name = load_repo_owner(galaxy_root, release_version, release_config)
+    # Issues are selected by milestone alone, so no dates need resolving here.
     if dry_run:
         click.echo(f"Dry run: would check blocking issues for milestone {release_version}")
         sys.exit(0)
     block = 0
     github = github_client()
-    repo = github.get_repo(get_repo_name(owner, repo_name))
-    issues = repo.get_issues(state="open")
+    github_repo = github.get_repo(get_repo_name(owner, repo))
+    issues = github_repo.get_issues(state="open")
     for issue in issues:
         if (
             issue.milestone

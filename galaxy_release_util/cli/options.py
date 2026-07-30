@@ -49,11 +49,18 @@ class ClickDate(click.ParamType):
             self.fail(f"{value!r} is not a valid date: {str(e)}", param, ctx)
 
 
-release_config_option = click.option(
-    "--release-config",
-    type=click.Path(exists=True, path_type=pathlib.Path),
-    default=None,
-    help="Path to release config YAML. Default: {galaxy-root}/doc/source/releases/{version}_release.yml",
+owner_option = click.option(
+    "--owner",
+    default="galaxyproject",
+    show_default=True,
+    help="GitHub organization or user owning the repository. Set when working against a fork.",
+)
+
+repo_option = click.option(
+    "--repo",
+    default="galaxy",
+    show_default=True,
+    help="GitHub repository name. Set when working against a fork.",
 )
 
 previous_version_option = click.option(

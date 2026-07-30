@@ -127,18 +127,13 @@ So the only setup required is a [milestone](https://github.com/galaxyproject/gal
 
 Any value can still be overridden with a flag, for example `--release-date 2026-02-17` or `--next-version 26.2`. FREEZE_DATE is not recorded anywhere on GitHub, so `create-release-issue` takes it as `--freeze-date`.
 
-#### Optional: release config YAML
+#### Working against a fork
 
-Values may also be pinned in a YAML file at `doc/source/releases/<RELEASE_TAG>_release.yml`, which is read automatically when it exists:
+Commands read `galaxyproject/galaxy` by default. Pass `--owner` and `--repo` to point them at a fork or private repository; this also decides which milestones are read:
 
-```yaml
-current-version: "<RELEASE_TAG>"
-previous-version: "<PREVIOUS_RELEASE_TAG>"
-freeze-date: "<FREEZE_DATE>"
-release-date: "<RELEASE_DATE>"
+```bash
+galaxy-release-util create-changelog <RELEASE_TAG> --owner <OWNER> --repo <REPO>
 ```
-
-Every field is optional; anything omitted is resolved from the milestones. Dates use `YYYY-MM-DD` format. Two further fields, `owner` and `repo`, default to `"galaxyproject"` and `"galaxy"` — set them when working against a fork or private repository, since they also decide which milestones are read.
 
 ---
 
@@ -160,7 +155,7 @@ cd <GALAXY_ROOT>
 galaxy-release-util create-release-issue <RELEASE_TAG> --freeze-date <FREEZE_DATE> --dry-run
 ```
 
-Everything else is read from the milestones. To use a config file at a non-default location, add `--release-config /path/to/config.yml`.
+Everything else is read from the milestones.
 
 4. Re run the command without `--dry-run` to open the issue on GitHub.
 
