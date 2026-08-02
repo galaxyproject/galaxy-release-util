@@ -5,6 +5,18 @@ History
 
 
 ------------------
+0.4.1 (02-08-2026)
+------------------
+* Read the package version from setup.cfg or pyproject.toml by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/55
+
+Galaxy's dev branch moved package metadata to PEP 621 ``pyproject.toml``. Merging a
+release branch forward, and building packages from the migrated tree, both died
+reading ``setup.cfg``. Either file is now accepted, and the forward merge resolves the
+``setup.cfg`` delete/modify conflict that the move introduces.
+
+Anyone releasing from a branch that still uses ``setup.cfg`` is unaffected.
+
+------------------
 0.4.0 (30-07-2026)
 ------------------
 * Derive release metadata from GitHub milestones, drop the config YAML by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/54
