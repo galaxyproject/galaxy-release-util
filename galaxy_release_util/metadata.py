@@ -1,11 +1,45 @@
 import re
-from typing import List
+from typing import (
+    List,
+    Protocol,
+    Sequence,
+)
 
 import click
-from github.PullRequest import PullRequest
 
 PROJECT_OWNER = "galaxyproject"
 PROJECT_NAME = "galaxy"
+
+
+class LabelLike(Protocol):
+    @property
+    def name(self) -> str:
+        raise NotImplementedError
+
+
+class PullRequestLike(Protocol):
+    """Subset of a pull request consumed here.
+
+    Satisfied both by ``github.PullRequest.PullRequest`` and by the summaries
+    that ``point_release`` builds from the GitHub GraphQL API.
+    """
+
+    @property
+    def number(self) -> int:
+        raise NotImplementedError
+
+    @property
+    def title(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def html_url(self) -> str:
+        raise NotImplementedError
+
+    @property
+    def labels(self) -> Sequence[LabelLike]:
+        raise NotImplementedError
+
 
 GROUPED_TAGS = dict(
     [
@@ -24,7 +58,7 @@ def _pr_to_str(pr):
     return f"PR #{pr.number} ({pr.title}) {pr.html_url}"
 
 
-def _text_target(pull_request: PullRequest, skip_merge=True):
+def _text_target(pull_request: PullRequestLike, skip_merge=True):
     pr_number = pull_request.number
     labels = [label.name.lower() for label in pull_request.labels]
     is_bug = is_enhancement = is_feature = is_minor = is_major = is_merge = is_small_enhancement = False
@@ -89,7 +123,7 @@ def _text_target(pull_request: PullRequest, skip_merge=True):
     return text_target
 
 
-def _pr_to_labels(pr: PullRequest) -> List[str]:
+def _pr_to_labels(pr: PullRequestLike) -> List[str]:
     labels = [label.name.lower() for label in pr.labels]
     return labels
 
