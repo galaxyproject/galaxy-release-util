@@ -54,6 +54,31 @@ HISTORY_TEMPLATE = """History
 """
 RELEASE_BRANCH_REGEX = re.compile(r"^release_(\d{2}\.\d{1,2})$")
 FIRST_RELEASE_CHANGELOG_TEXT = "First release"
+# Older Galaxy branches declare the package version in ``setup.cfg``, newer ones in
+# ``pyproject.toml``. On branches that still use ``setup.cfg`` the ``pyproject.toml``
+# is a symlink to a shared build config that carries no version, so ``setup.cfg``
+# has to be consulted first.
+VERSION_FILENAMES = ("setup.cfg", "pyproject.toml")
+VERSION_LINE_REGEX = re.compile(r"""^version\s*=\s*(?P<quote>["']?)(?P<version>[^"'\s]+)(?P=quote)\s*$""")
+# Newer Galaxy releases moved the package sources under ``src``.
+PACKAGE_CODE_DIRS = (
+    Path("galaxy"),
+    Path("tests"),
+    Path("galaxy_test"),
+    Path("src", "galaxy"),
+    Path("src", "galaxy_test"),
+)
+
+
+def read_declared_version(version_file: Path) -> Optional[str]:
+    """Return the version declared in ``version_file``, or None if there is none."""
+    if not version_file.is_file():
+        return None
+    for line in version_file.read_text().splitlines():
+        match = VERSION_LINE_REGEX.match(line)
+        if match:
+            return match.group("version")
+    return None
 
 
 @dataclass
@@ -107,8 +132,13 @@ class Package:
         return self.path.name
 
     @property
-    def setup_cfg(self) -> Path:
-        return self.path / "setup.cfg"
+    def version_file(self) -> Path:
+        """The file that declares this package's version."""
+        for filename in VERSION_FILENAMES:
+            candidate = self.path / filename
+            if read_declared_version(candidate) is not None:
+                return candidate
+        raise ValueError(f"None of {', '.join(VERSION_FILENAMES)} in {self.path} contains a version line")
 
     @property
     def history_rst(self) -> Path:
@@ -136,7 +166,7 @@ class Package:
             # every commit is relevant:
             return [self.path / ".." / ".."]
         package_code_paths = []
-        for code_dir in ["galaxy", "tests", "galaxy_test"]:
+        for code_dir in PACKAGE_CODE_DIRS:
             package_code_path = self.path / code_dir
             if package_code_path.exists():
                 # get all symlinks pointing to a directory
@@ -204,16 +234,14 @@ def get_sorted_package_paths(galaxy_root: Path) -> List[Path]:
 
 
 def read_package(package_path: Path) -> Package:
-    setup_cfg = package_path / "setup.cfg"
-    package = None
-    with setup_cfg.open() as content:
-        for line in content:
-            if line.startswith("version = "):
-                version = line.strip().split("version = ")[-1]
-                package = Package(path=package_path, current_version=version)
-                break
-    if not package:
-        raise ValueError(f"{setup_cfg} does not contain version line")
+    version = None
+    for filename in VERSION_FILENAMES:
+        version = read_declared_version(package_path / filename)
+        if version is not None:
+            break
+    if version is None:
+        raise ValueError(f"None of {', '.join(VERSION_FILENAMES)} in {package_path} contains a version line")
+    package = Package(path=package_path, current_version=version)
     package.package_history = parse_changelog(package)
     return package
 
@@ -293,10 +321,19 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
 
 
 def bump_package_version(package: Package, new_version: Version) -> None:
-    content = package.setup_cfg.read_text().splitlines()
-    new_content = [f"version = {new_version}" if line.startswith("version = ") else line for line in content]
-    package.setup_cfg.write_text("\n".join(new_content) + "\n")
-    package.modified_paths.append(package.setup_cfg)
+    version_file = package.version_file
+    new_content = []
+    bumped = False
+    for line in version_file.read_text().splitlines():
+        match = VERSION_LINE_REGEX.match(line)
+        if match and not bumped:
+            # keep the quoting style of the file we're rewriting
+            quote = match.group("quote")
+            line = f"version = {quote}{new_version}{quote}"
+            bumped = True
+        new_content.append(line)
+    version_file.write_text("\n".join(new_content) + "\n")
+    package.modified_paths.append(version_file)
 
 
 def commits_to_prs(packages: List[Package], owner: str = PROJECT_OWNER, repo_name: str = PROJECT_NAME) -> None:
@@ -458,6 +495,30 @@ def get_branches(galaxy_root: Path, new_version: Version, current_branch: str) -
     return release_branches
 
 
+def restore_version_files(galaxy_root: Path, new_branch: str, package_path: Path) -> None:
+    """Restore a package's version metadata as it is on ``new_branch``.
+
+    Which file holds the version differs across branches: older ones use
+    ``setup.cfg``, newer ones ``pyproject.toml``. Merging an older branch forward
+    reintroduces ``setup.cfg`` as an unresolved delete/modify conflict, so any
+    version file the newer branch doesn't have is removed instead of restored.
+    """
+    for filename in VERSION_FILENAMES:
+        version_file = package_path / filename
+        exists_in_new_branch = (
+            subprocess.run(
+                ["git", "cat-file", "-e", f"{new_branch}:{version_file.relative_to(galaxy_root)}"],
+                cwd=galaxy_root,
+                capture_output=True,
+            ).returncode
+            == 0
+        )
+        if exists_in_new_branch:
+            subprocess.run(["git", "checkout", new_branch, str(version_file)], cwd=galaxy_root).check_returncode()
+        else:
+            subprocess.run(["git", "rm", "-f", "--ignore-unmatch", str(version_file)], cwd=galaxy_root)
+
+
 def merge_and_resolve_branches(
     galaxy_root: Path,
     base_branch: str,
@@ -532,10 +593,7 @@ def merge_and_resolve_branches(
         previous_package.package_history.insert(0, ChangelogItem(version=dev_version, changes=[], date=None))
         previous_package.write_history()
         subprocess.run(["git", "add", str(previous_package.history_rst)], cwd=galaxy_root)
-        # restore setup.cfg
-        subprocess.run(
-            ["git", "checkout", new_branch, str(previous_package.setup_cfg)], cwd=galaxy_root
-        ).check_returncode()
+        restore_version_files(galaxy_root, new_branch, previous_package.path)
     # Commit changes
     if merge_conflict:
         subprocess.run(["git", "commit", "--no-edit"], cwd=galaxy_root).check_returncode()
