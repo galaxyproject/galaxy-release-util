@@ -6,6 +6,7 @@ from packaging.version import Version
 
 from galaxy_release_util.point_release import (
     Package,
+    bump_package_version,
     commits_to_prs,
     parse_changelog,
     read_package,
@@ -16,6 +17,25 @@ SETUP_CFG_CONTENTS = """\
 name = galaxy-app
 version = 23.0.2
 author = Galaxy Project
+"""
+
+# Shared build config that older branches symlink to as ``pyproject.toml``
+SHARED_PYPROJECT_CONTENTS = """\
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+"""
+
+# Newer branches declare the version in a per-package ``pyproject.toml``
+PYPROJECT_CONTENTS = """\
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "galaxy-app"
+version = "23.0.2"
+requires-python = ">=3.10"
 """
 
 HISTORY_RST_SIMPLE = """\
@@ -87,10 +107,18 @@ Not a real RST document
 """
 
 
-def _write_package(tmp_path: pathlib.Path, setup_cfg: str = SETUP_CFG_CONTENTS, history_rst: str = HISTORY_RST_SIMPLE):
+def _write_package(
+    tmp_path: pathlib.Path,
+    setup_cfg: str = SETUP_CFG_CONTENTS,
+    history_rst: str = HISTORY_RST_SIMPLE,
+    pyproject: str = SHARED_PYPROJECT_CONTENTS,
+):
     pkg_path = tmp_path / "galaxy-app"
     pkg_path.mkdir()
-    (pkg_path / "setup.cfg").write_text(setup_cfg)
+    if setup_cfg:
+        (pkg_path / "setup.cfg").write_text(setup_cfg)
+    if pyproject:
+        (pkg_path / "pyproject.toml").write_text(pyproject)
     (pkg_path / "HISTORY.rst").write_text(history_rst)
     return pkg_path
 
@@ -102,14 +130,54 @@ class TestReadPackage:
         assert package.current_version == "23.0.2"
         assert package.name == "galaxy-app"
         assert len(package.package_history) > 0
+        assert package.version_file == pkg_path / "setup.cfg"
+
+    def test_pyproject_only(self, tmp_path):
+        pkg_path = _write_package(tmp_path, setup_cfg="", pyproject=PYPROJECT_CONTENTS)
+        package = read_package(pkg_path)
+        assert package.current_version == "23.0.2"
+        assert package.version_file == pkg_path / "pyproject.toml"
+
+    def test_setup_cfg_wins_over_shared_pyproject(self, tmp_path):
+        # older branches symlink pyproject.toml to a shared, versionless build config
+        pkg_path = _write_package(tmp_path)
+        assert read_package(pkg_path).version_file == pkg_path / "setup.cfg"
 
     def test_missing_version(self, tmp_path):
         pkg_path = tmp_path / "broken"
         pkg_path.mkdir()
         (pkg_path / "setup.cfg").write_text("[metadata]\nname = broken\n")
         (pkg_path / "HISTORY.rst").write_text(HISTORY_RST_SIMPLE)
-        with pytest.raises(ValueError, match="does not contain version line"):
+        with pytest.raises(ValueError, match="contains a version line"):
             read_package(pkg_path)
+
+    def test_no_version_file(self, tmp_path):
+        pkg_path = tmp_path / "broken"
+        pkg_path.mkdir()
+        (pkg_path / "HISTORY.rst").write_text(HISTORY_RST_SIMPLE)
+        with pytest.raises(ValueError, match="contains a version line"):
+            read_package(pkg_path)
+
+
+class TestBumpPackageVersion:
+    def test_bumps_setup_cfg(self, tmp_path):
+        pkg_path = _write_package(tmp_path)
+        package = read_package(pkg_path)
+        bump_package_version(package, Version("23.0.3"))
+        assert "version = 23.0.3\n" in (pkg_path / "setup.cfg").read_text()
+        assert package.modified_paths == [pkg_path / "setup.cfg"]
+        # the shared build config is left alone
+        assert (pkg_path / "pyproject.toml").read_text() == SHARED_PYPROJECT_CONTENTS
+
+    def test_bumps_pyproject_keeping_quotes(self, tmp_path):
+        pkg_path = _write_package(tmp_path, setup_cfg="", pyproject=PYPROJECT_CONTENTS)
+        package = read_package(pkg_path)
+        bump_package_version(package, Version("23.0.3"))
+        contents = (pkg_path / "pyproject.toml").read_text()
+        assert 'version = "23.0.3"\n' in contents
+        # unrelated lines are preserved
+        assert 'name = "galaxy-app"' in contents
+        assert package.modified_paths == [pkg_path / "pyproject.toml"]
 
 
 class TestParseChangelog:
