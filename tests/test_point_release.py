@@ -8,6 +8,7 @@ from galaxy_release_util import point_release
 from galaxy_release_util.metadata import _text_target
 from galaxy_release_util.point_release import (
     Package,
+    build_meta_dependencies,
     bump_package_version,
     commits_to_prs,
     parse_changelog,
@@ -180,6 +181,72 @@ class TestBumpPackageVersion:
         # unrelated lines are preserved
         assert 'name = "galaxy-app"' in contents
         assert package.modified_paths == [pkg_path / "pyproject.toml"]
+
+
+class TestBuildMetaDependencies:
+    def _packages(self, tmp_path):
+        meta_path = tmp_path / "packages" / "meta"
+        meta_path.mkdir(parents=True)
+        pinned_requirements = tmp_path / "lib" / "galaxy" / "dependencies" / "pinned-requirements.txt"
+        pinned_requirements.parent.mkdir(parents=True)
+        pinned_requirements.write_text("# generated\nrequests==2.32.4\n\n--extra-index-url https://example.com\n")
+        return meta_path, [
+            Package(path=tmp_path / "packages" / name, current_version="26.1.dev0")
+            for name in ("util", "tool_shed", "meta", "app")
+        ]
+
+    def test_writes_static_pyproject_dependencies(self, tmp_path):
+        meta_path, packages = self._packages(tmp_path)
+        pyproject = meta_path / "pyproject.toml"
+        pyproject.write_text("""\
+[project]
+name = "galaxy"
+dependencies = [
+]
+
+[project.optional-dependencies]
+postgresql = ["psycopg[binary]"]
+""")
+
+        build_meta_dependencies(packages[2], packages, Version("26.1"))
+
+        contents = pyproject.read_text()
+        assert '    "galaxy-app==26.1",\n' in contents
+        assert '    "galaxy-util==26.1",\n' in contents
+        assert '    "requests==2.32.4",\n' in contents
+        assert "galaxy-meta" not in contents
+        assert "galaxy-tool_shed" not in contents
+        assert 'postgresql = ["psycopg[binary]"]' in contents
+
+    def test_restores_legacy_setup_cfg_requirements_hook(self, tmp_path):
+        meta_path, packages = self._packages(tmp_path)
+        (meta_path / "pyproject.toml").write_text("""\
+[project]
+dynamic = ["dependencies", "version"]
+name = "galaxy"
+""")
+        setup_cfg = meta_path / "setup.cfg"
+        setup_cfg.write_text("""\
+[metadata]
+version = 26.1.dev0
+
+[options]
+packages = find:
+python_requires = >=3.10
+
+[options.extras_require]
+postgresql =
+    psycopg[binary]
+""")
+
+        build_meta_dependencies(packages[2], packages, Version("26.1"))
+
+        assert "[options]\ninstall_requires = file: requirements.txt\n" in setup_cfg.read_text()
+        assert (meta_path / "requirements.txt").read_text().splitlines() == [
+            "galaxy-app==26.1",
+            "galaxy-util==26.1",
+            "requests==2.32.4",
+        ]
 
 
 class TestParseChangelog:
