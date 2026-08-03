@@ -5,6 +5,19 @@ History
 
 
 ------------------
+0.4.2 (03-08-2026)
+------------------
+* Resolve commits to pull requests in batched GraphQL queries by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/56
+* Fix meta package dependencies after PEP 621 migration by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/57
+
+Commit-to-pull-request lookups are now batched through GraphQL and run concurrently,
+reducing large release runs from thousands of REST requests to a few dozen queries.
+
+Meta-package dependency generation now supports both static PEP 621 metadata and the
+transitional ``setup.cfg`` layout, and ignores blank lines, comments, and pip options
+when assembling dependencies.
+
+------------------
 0.4.1 (02-08-2026)
 ------------------
 * Read the package version from setup.cfg or pyproject.toml by @mvdbeek in https://github.com/galaxyproject/galaxy-release-util/pull/55
