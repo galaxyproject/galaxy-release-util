@@ -869,13 +869,88 @@ def build_meta_dependencies(meta_package: Package, packages: List[Package], new_
     # Skip tool shed, should not be required at runtime, and skip meta package itself
     meta_deps = [f"galaxy-{p.name}=={new_version}" for p in packages if p.name not in ("meta", "tool_shed")]
     for line in meta_package.pinned_requirements_txt.read_text().splitlines():
-        if not line.startswith(("--", "#")):
-            meta_deps.append(line)
+        requirement = line.strip()
+        if requirement and not requirement.startswith(("--", "#")):
+            meta_deps.append(requirement)
     meta_deps.sort()
     requirements_txt = meta_package.path.joinpath("requirements.txt")
     requirements_txt.write_text("\n".join(meta_deps))
     # Don't add requirements.txt to meta_package.modified_paths, since this is
     # in Galaxy's .gitignore
+
+    pyproject_toml = meta_package.path / "pyproject.toml"
+    if _write_pyproject_dependencies(pyproject_toml, meta_deps):
+        return
+
+    # During Galaxy's transition to PEP 621, pyproject.toml declared dependencies
+    # as dynamic and setuptools still read their value from setup.cfg. The src
+    # layout migration accidentally removed this hook from the meta package.
+    setup_cfg = meta_package.path / "setup.cfg"
+    if _ensure_setup_cfg_requirements_file(setup_cfg):
+        return
+
+    raise ValueError(
+        f"Cannot configure dependencies for meta package at {meta_package.path}: "
+        "expected [project].dependencies in pyproject.toml or [options] in setup.cfg"
+    )
+
+
+def _write_pyproject_dependencies(pyproject_toml: Path, dependencies: List[str]) -> bool:
+    """Replace a static PEP 621 dependency list, preserving the rest of the file."""
+    if not pyproject_toml.is_file():
+        return False
+
+    lines = pyproject_toml.read_text().splitlines(keepends=True)
+    try:
+        project_start = next(i for i, line in enumerate(lines) if line.strip() == "[project]") + 1
+    except StopIteration:
+        return False
+    project_end = next((i for i in range(project_start, len(lines)) if lines[i].lstrip().startswith("[")), len(lines))
+
+    dependency_start = None
+    dependency_end = None
+    assignment = re.compile(r"^\s*dependencies\s*=\s*\[")
+    closing_bracket = re.compile(r"^\s*\]\s*(?:#.*)?$")
+    for i in range(project_start, project_end):
+        match = assignment.match(lines[i])
+        if not match:
+            continue
+        dependency_start = i
+        if "]" in lines[i][match.end() :]:
+            dependency_end = i + 1
+        else:
+            dependency_end = next(
+                (j + 1 for j in range(i + 1, project_end) if closing_bracket.match(lines[j].rstrip("\n"))),
+                None,
+            )
+        break
+
+    if dependency_start is None or dependency_end is None:
+        return False
+
+    rendered = ["dependencies = [\n"]
+    rendered.extend(f"    {json.dumps(dependency)},\n" for dependency in dependencies)
+    rendered.append("]\n")
+    lines[dependency_start:dependency_end] = rendered
+    pyproject_toml.write_text("".join(lines))
+    return True
+
+
+def _ensure_setup_cfg_requirements_file(setup_cfg: Path) -> bool:
+    """Ensure legacy dynamic metadata reads the generated requirements file."""
+    if not setup_cfg.is_file():
+        return False
+
+    lines = setup_cfg.read_text().splitlines(keepends=True)
+    try:
+        options_start = next(i for i, line in enumerate(lines) if line.strip() == "[options]") + 1
+    except StopIteration:
+        return False
+    options_end = next((i for i in range(options_start, len(lines)) if lines[i].lstrip().startswith("[")), len(lines))
+    if not any(re.match(r"^\s*install_requires\s*=", lines[i]) for i in range(options_start, options_end)):
+        lines.insert(options_start, "install_requires = file: requirements.txt\n")
+        setup_cfg.write_text("".join(lines))
+    return True
 
 
 def show_modified_paths_and_diff(galaxy_root: Path, modified_paths: List[Path], no_confirm: bool) -> None:
