@@ -2,15 +2,18 @@ import datetime
 import json
 import re
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import (
     dataclass,
     field,
 )
 from pathlib import Path
 from typing import (
+    Any,
     Dict,
     List,
     Optional,
+    Sequence,
     Set,
     Tuple,
 )
@@ -22,7 +25,7 @@ from docutils import (
     utils,
 )
 from docutils.parsers.rst import Parser
-from github import PullRequest
+from github import Github
 from packaging.version import Version
 
 from .cli.options import (
@@ -68,6 +71,50 @@ PACKAGE_CODE_DIRS = (
     Path("src", "galaxy"),
     Path("src", "galaxy_test"),
 )
+# A release can span thousands of commits, so commit -> PR lookups go through the
+# GraphQL API, which resolves a whole batch of commits per request.
+COMMITS_PER_GRAPHQL_QUERY = 100
+GRAPHQL_QUERY_WORKERS = 4
+COMMIT_PULL_REQUESTS_FRAGMENT = """
+fragment commitPullRequests on Commit {
+  associatedPullRequests(first: 10) {
+    nodes {
+      number
+      title
+      url
+      author {
+        login
+      }
+      labels(first: 50) {
+        nodes {
+          name
+        }
+      }
+    }
+  }
+}
+"""
+
+
+@dataclass(frozen=True)
+class Label:
+    name: str
+
+
+@dataclass(frozen=True)
+class User:
+    login: str
+
+
+@dataclass(frozen=True)
+class PullRequestSummary:
+    """The pull request attributes needed to write a changelog entry."""
+
+    number: int
+    title: str
+    html_url: str
+    user: User
+    labels: Tuple[Label, ...]
 
 
 def read_declared_version(version_file: Path) -> Optional[str]:
@@ -122,7 +169,7 @@ class Package:
     path: Path
     current_version: str
     commits: Set[str] = field(default_factory=set)
-    prs: Set[PullRequest.PullRequest] = field(default_factory=set)
+    prs: Set[PullRequestSummary] = field(default_factory=set)
     modified_paths: List[Path] = field(default_factory=list)
     package_history: List[ChangelogItem] = field(default_factory=list)
     release_items: List[ReleaseItem] = field(default_factory=list)
@@ -336,26 +383,64 @@ def bump_package_version(package: Package, new_version: Version) -> None:
     package.modified_paths.append(version_file)
 
 
+def _build_commit_prs_query(batch_size: int) -> str:
+    """Build a query that resolves ``batch_size`` commits in a single request.
+
+    GraphQL cannot look up a list of commits, so each commit gets its own aliased
+    ``object`` selection.
+    """
+    variable_definitions = ", ".join(f"$commit{i}: String!" for i in range(batch_size))
+    selections = "\n    ".join(
+        f"commit{i}: object(expression: $commit{i}) {{ ...commitPullRequests }}" for i in range(batch_size)
+    )
+    return f"""query($owner: String!, $name: String!, {variable_definitions}) {{
+  repository(owner: $owner, name: $name) {{
+    {selections}
+  }}
+}}
+{COMMIT_PULL_REQUESTS_FRAGMENT}"""
+
+
+def _parse_pull_request(node: Dict[str, Any]) -> PullRequestSummary:
+    # The author is null for pull requests opened by since-deleted accounts.
+    author = node.get("author") or {}
+    return PullRequestSummary(
+        number=node["number"],
+        title=node["title"],
+        html_url=node["url"],
+        user=User(login=author.get("login", "ghost")),
+        labels=tuple(Label(name=label["name"]) for label in node["labels"]["nodes"]),
+    )
+
+
+def _fetch_commit_prs(
+    github: Github, owner: str, repo_name: str, commits: Sequence[str]
+) -> Dict[str, PullRequestSummary]:
+    """Map each commit of a single batch to its associated pull request, if any."""
+    variables: Dict[str, Any] = {"owner": owner, "name": repo_name}
+    variables.update({f"commit{i}": commit for i, commit in enumerate(commits)})
+    _, response = github.requester.graphql_query(_build_commit_prs_query(len(commits)), variables)
+    repository = response["data"]["repository"]
+    commit_to_pr = {}
+    for i, commit in enumerate(commits):
+        pull_requests = ((repository.get(f"commit{i}") or {}).get("associatedPullRequests") or {}).get("nodes") or []
+        for pull_request in pull_requests:
+            commit_to_pr[commit] = _parse_pull_request(pull_request)
+    return commit_to_pr
+
+
 def commits_to_prs(packages: List[Package], owner: str = PROJECT_OWNER, repo_name: str = PROJECT_NAME) -> None:
     g = github_client()
-    commits = set.union(*(p.commits for p in packages))
-    pr_cache = {}
-    commit_to_pr = {}
-    repo = g.get_repo(get_repo_name(owner, repo_name))
-    total_commits = len(commits)
-    skipped = []
-    for i, commit in enumerate(commits):
-        click.echo(f"Processing commit {i + 1} of {total_commits}")
-        # Get the list of pull requests associated with the commit
-        commit_obj = repo.get_commit(commit)
-        prs = commit_obj.get_pulls()
-        if not prs or prs.totalCount == 0:
-            skipped.append(commit)
-            continue
-        for pr in prs:
-            if pr.number not in pr_cache:
-                pr_cache[pr.number] = pr
-            commit_to_pr[commit] = pr_cache[pr.number]
+    commits = sorted(set.union(*(p.commits for p in packages)))
+    batches = [commits[i : i + COMMITS_PER_GRAPHQL_QUERY] for i in range(0, len(commits), COMMITS_PER_GRAPHQL_QUERY)]
+    click.echo(f"Finding pull requests for {len(commits)} commits in {len(batches)} queries")
+    commit_to_pr: Dict[str, PullRequestSummary] = {}
+    with ThreadPoolExecutor(max_workers=GRAPHQL_QUERY_WORKERS) as executor:
+        results = executor.map(lambda batch: _fetch_commit_prs(g, owner, repo_name, batch), batches)
+        for i, batch_result in enumerate(results):
+            commit_to_pr.update(batch_result)
+            click.echo(f"Processed query {i + 1} of {len(batches)}")
+    skipped = [commit for commit in commits if commit not in commit_to_pr]
     if skipped:
         click.echo(f"Warning: {len(skipped)} commit(s) have no associated PRs (e.g. merge commits):", err=True)
         for sha in skipped:

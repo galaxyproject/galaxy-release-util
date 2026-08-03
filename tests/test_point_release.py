@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from packaging.version import Version
 
+from galaxy_release_util import point_release
+from galaxy_release_util.metadata import _text_target
 from galaxy_release_util.point_release import (
     Package,
     bump_package_version,
@@ -218,54 +220,120 @@ class TestParseChangelog:
             parse_changelog(package)
 
 
+def _pr_node(number, labels=("kind/bug",), login="someuser"):
+    return {
+        "number": number,
+        "title": f"Fix thing {number}",
+        "url": f"https://github.com/galaxyproject/galaxy/pull/{number}",
+        "author": {"login": login},
+        "labels": {"nodes": [{"name": label} for label in labels]},
+    }
+
+
+class FakeRequester:
+    """Answers the batched commit -> PR query from a commit/PR-node mapping."""
+
+    def __init__(self, commit_to_pr_node):
+        self.commit_to_pr_node = commit_to_pr_node
+        self.queries = []
+
+    def graphql_query(self, query, variables):
+        self.queries.append(variables)
+        commits = [value for key, value in variables.items() if key.startswith("commit")]
+        repository = {}
+        for i, commit in enumerate(commits):
+            node = self.commit_to_pr_node.get(commit)
+            repository[f"commit{i}"] = {"associatedPullRequests": {"nodes": [node] if node else []}}
+        return {}, {"data": {"repository": repository}}
+
+
+def _patch_github(commit_to_pr_node):
+    requester = FakeRequester(commit_to_pr_node)
+    mock_github = MagicMock()
+    mock_github.requester = requester
+    return requester, patch("galaxy_release_util.point_release.github_client", return_value=mock_github)
+
+
 class TestCommitsToPrs:
     def test_commits_mapped_to_prs(self):
-        mock_pr = MagicMock()
-        mock_pr.number = 42
-        mock_pr.title = "Fix something"
-
-        mock_pulls = MagicMock()
-        mock_pulls.totalCount = 1
-        mock_pulls.__iter__ = MagicMock(return_value=iter([mock_pr]))
-        mock_pulls.__bool__ = MagicMock(return_value=True)
-
-        mock_commit = MagicMock()
-        mock_commit.get_pulls.return_value = mock_pulls
-
-        mock_repo = MagicMock()
-        mock_repo.get_commit.return_value = mock_commit
-
-        mock_github = MagicMock()
-        mock_github.get_repo.return_value = mock_repo
-
+        _, patched = _patch_github({"abc123": _pr_node(42)})
         package = Package(path=pathlib.Path("/fake"), current_version="1.0")
         package.commits = {"abc123"}
 
-        with patch("galaxy_release_util.point_release.github_client", return_value=mock_github):
+        with patched:
             commits_to_prs([package])
 
         assert len(package.prs) == 1
         pr = next(iter(package.prs))
         assert pr.number == 42
+        assert pr.title == "Fix thing 42"
+        assert pr.html_url == "https://github.com/galaxyproject/galaxy/pull/42"
+        assert pr.user.login == "someuser"
+        assert [label.name for label in pr.labels] == ["kind/bug"]
 
     def test_commits_without_prs_skipped(self):
-        mock_pulls = MagicMock()
-        mock_pulls.totalCount = 0
-        mock_pulls.__bool__ = MagicMock(return_value=False)
-
-        mock_commit = MagicMock()
-        mock_commit.get_pulls.return_value = mock_pulls
-
-        mock_repo = MagicMock()
-        mock_repo.get_commit.return_value = mock_commit
-
-        mock_github = MagicMock()
-        mock_github.get_repo.return_value = mock_repo
-
+        _, patched = _patch_github({})
         package = Package(path=pathlib.Path("/fake"), current_version="1.0")
         package.commits = {"abc123", "def456"}
 
-        with patch("galaxy_release_util.point_release.github_client", return_value=mock_github):
+        with patched:
             commits_to_prs([package])
 
         assert len(package.prs) == 0
+
+    def test_same_pr_across_commits_deduped(self):
+        node = _pr_node(42)
+        _, patched = _patch_github({"abc123": node, "def456": node})
+        package = Package(path=pathlib.Path("/fake"), current_version="1.0")
+        package.commits = {"abc123", "def456"}
+
+        with patched:
+            commits_to_prs([package])
+
+        assert len(package.prs) == 1
+
+    def test_commits_are_batched(self, monkeypatch):
+        monkeypatch.setattr(point_release, "COMMITS_PER_GRAPHQL_QUERY", 2)
+        commits = {f"commit{i}": _pr_node(i) for i in range(5)}
+        requester, patched = _patch_github(commits)
+        package = Package(path=pathlib.Path("/fake"), current_version="1.0")
+        package.commits = set(commits)
+
+        with patched:
+            commits_to_prs([package])
+
+        assert len(requester.queries) == 3
+        assert sorted(pr.number for pr in package.prs) == [0, 1, 2, 3, 4]
+
+    def test_prs_are_queried_for_the_requested_repo(self):
+        requester, patched = _patch_github({"abc123": _pr_node(42)})
+        package = Package(path=pathlib.Path("/fake"), current_version="1.0")
+        package.commits = {"abc123"}
+
+        with patched:
+            commits_to_prs([package], owner="someowner", repo_name="somerepo")
+
+        assert requester.queries[0]["owner"] == "someowner"
+        assert requester.queries[0]["name"] == "somerepo"
+
+    def test_missing_author_falls_back_to_ghost(self):
+        node = _pr_node(42)
+        node["author"] = None
+        _, patched = _patch_github({"abc123": node})
+        package = Package(path=pathlib.Path("/fake"), current_version="1.0")
+        package.commits = {"abc123"}
+
+        with patched:
+            commits_to_prs([package])
+
+        assert next(iter(package.prs)).user.login == "ghost"
+
+    def test_pr_summary_drives_changelog_categorization(self):
+        _, patched = _patch_github({"abc123": _pr_node(42, labels=("kind/enhancement", "area/tools"))})
+        package = Package(path=pathlib.Path("/fake"), current_version="1.0")
+        package.commits = {"abc123"}
+
+        with patched:
+            commits_to_prs([package])
+
+        assert _text_target(next(iter(package.prs)), skip_merge=False) == "enhancement_tag_tools\n"
