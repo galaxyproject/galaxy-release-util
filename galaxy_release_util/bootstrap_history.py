@@ -225,14 +225,14 @@ RELEASE_ISSUE_TEMPLATE = string.Template("""
 
     - [ ] Create and push release branch:
 
-          make release-create-rc
+          galaxy-release-util create-release-branch ${version}
 
-      This creates two branches:
+      Run this from the Galaxy root with ``GITHUB_AUTH`` set. The next version, `${next_version}`, is read from the milestones (pass ``--next-version`` to override). It pushes `dev` as `release_${version}` and pushes two branches to your fork (``--fork-remote``, default ``origin``), printing a pull request link for each:
 
-        - ``version-${next_version}.dev``: Open a pull request against `dev`. Verify the future version number and remove any generated client hash build artifacts if present.
         - ``version-${version}.rc1``: Open a pull request against `release_${version}`.
+        - ``version-${next_version}.dev``: Open a pull request against `dev`. It moves `dev` to `${next_version}.dev0` and merges the rc1 version commit.
 
-      Note: These steps may silently fail without producing any branches. Inspect ``cat packages/app/make-dist.log`` if branches were not created.
+      Every push is confirmed first. Pass ``--dry-run`` to create the commits locally without pushing. Running the command again once `release_${version}` exists creates the next release candidate (``version-${version}.rc2``, ...).
 
     - [ ] Create a new GitHub label `release-testing-${version}` at https://github.com/galaxyproject/galaxy/labels to tag all release testing PRs.
 
