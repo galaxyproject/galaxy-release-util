@@ -50,8 +50,7 @@ from .util import (
 
 OLDER_RELEASES_FILENAME = "older_releases.rst"
 
-ANNOUNCE_TEMPLATE = string.Template(
-    """
+ANNOUNCE_TEMPLATE = string.Template("""
 ===========================================================
 ${release} Galaxy Release (${month_name} ${year})
 ===========================================================
@@ -116,11 +115,9 @@ A special thank you goes to everyone who helped test the new release after its d
 ----
 
 .. include:: _thanks.rst
-"""  # noqa: E501
-)
+""")  # noqa: E501
 
-ANNOUNCE_USER_TEMPLATE = string.Template(
-    """
+ANNOUNCE_USER_TEMPLATE = string.Template("""
 ===========================================================
 ${release} Galaxy Release (${month_name} ${year})
 ===========================================================
@@ -175,25 +172,21 @@ The admin-facing release notes are available :doc:`here <${release}_announce>`.
 ----
 
 .. include:: _thanks.rst
-"""  # noqa: E501
-)
+""")  # noqa: E501
 
-NEXT_TEMPLATE = string.Template(
-    """
+NEXT_TEMPLATE = string.Template("""
 :orphan:
 
 ===========================================================
 ${release} Galaxy Release
 ===========================================================
-"""
-)
+""")
 
 PRS_TEMPLATE = """
 .. github_links
 """
 
-RELEASE_ISSUE_TEMPLATE = string.Template(
-    """
+RELEASE_ISSUE_TEMPLATE = string.Template("""
 
 - [ ] **Freeze Release (on or around ${freeze_date})**
 
@@ -385,8 +378,7 @@ RELEASE_ISSUE_TEMPLATE = string.Template(
 
     - [ ] Close milestone ``${version}`` and ensure milestone ``${next_version}`` exists with its due date set. Closing ``${version}`` is safe: milestones are read regardless of state, so the ``${version}`` release notes can still be regenerated afterwards.
     - [ ] Close this issue.
-"""  # noqa: E501
-)
+""")  # noqa: E501
 
 release_version_argument = click.argument("release-version", type=ClickVersion())
 

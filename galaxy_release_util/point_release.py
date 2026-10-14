@@ -305,15 +305,11 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
     changelog_items: List[ChangelogItem] = []
     root_section = document[0]
     if not isinstance(root_section, docutils.nodes.section):
-        raise ValueError(
-            f"Expected top-level section in {package.history_rst}, got {type(root_section).__name__}"
-        )
+        raise ValueError(f"Expected top-level section in {package.history_rst}, got {type(root_section).__name__}")
     for node in root_section.children:
         # ignore title and comment
         if not isinstance(node, (docutils.nodes.title, docutils.nodes.comment, docutils.nodes.section)):
-            raise ValueError(
-                f"Unexpected node type {type(node).__name__} in {package.history_rst}: {node}"
-            )
+            raise ValueError(f"Unexpected node type {type(node).__name__} in {package.history_rst}: {node}")
         if isinstance(node, docutils.nodes.section):
             release_version = node[0].astext()
             current_date = None

@@ -79,7 +79,9 @@ def no_pr_scraping(monkeypatch):
         pytest.param(["--next-version", "99.0", "--release-date", "2099-01-15"], id="from-flags"),
     ],
 )
-def test_create_changelog_writes_the_release_files(galaxy_root, releases_dir, milestones, no_pr_scraping, expected, extra_args):
+def test_create_changelog_writes_the_release_files(
+    galaxy_root, releases_dir, milestones, no_pr_scraping, expected, extra_args
+):
     milestones()
     result = CliRunner().invoke(create_changelog, ["98.2", "--galaxy-root", str(galaxy_root), *extra_args])
     assert result.exit_code == 0, result.output
@@ -157,7 +159,16 @@ def test_create_release_issue_rejects_a_next_version_that_precedes_the_release(g
     milestones()
     result = CliRunner().invoke(
         create_release_issue,
-        ["98.2", "--galaxy-root", str(galaxy_root), "--next-version", "98.0", "--freeze-date", "2098-12-01", "--dry-run"],
+        [
+            "98.2",
+            "--galaxy-root",
+            str(galaxy_root),
+            "--next-version",
+            "98.0",
+            "--freeze-date",
+            "2098-12-01",
+            "--dry-run",
+        ],
     )
     assert result.exit_code != 0
     assert "--next-version (98.0) must be greater than release version (98.2)" in result.output
