@@ -1,7 +1,9 @@
 import datetime
 import json
 import re
+import shutil
 import subprocess
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import (
     dataclass,
@@ -280,15 +282,16 @@ def get_sorted_package_paths(galaxy_root: Path) -> List[Path]:
     return [root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")]
 
 
-def read_package(package_path: Path) -> Package:
-    version = None
+def read_package_version(package_path: Path) -> str:
     for filename in VERSION_FILENAMES:
         version = read_declared_version(package_path / filename)
         if version is not None:
-            break
-    if version is None:
-        raise ValueError(f"None of {', '.join(VERSION_FILENAMES)} in {package_path} contains a version line")
-    package = Package(path=package_path, current_version=version)
+            return version
+    raise ValueError(f"None of {', '.join(VERSION_FILENAMES)} in {package_path} contains a version line")
+
+
+def read_package(package_path: Path) -> Package:
+    package = Package(path=package_path, current_version=read_package_version(package_path))
     package.package_history = parse_changelog(package)
     return package
 
@@ -305,15 +308,11 @@ def parse_changelog(package: Package) -> List[ChangelogItem]:
     changelog_items: List[ChangelogItem] = []
     root_section = document[0]
     if not isinstance(root_section, docutils.nodes.section):
-        raise ValueError(
-            f"Expected top-level section in {package.history_rst}, got {type(root_section).__name__}"
-        )
+        raise ValueError(f"Expected top-level section in {package.history_rst}, got {type(root_section).__name__}")
     for node in root_section.children:
         # ignore title and comment
         if not isinstance(node, (docutils.nodes.title, docutils.nodes.comment, docutils.nodes.section)):
-            raise ValueError(
-                f"Unexpected node type {type(node).__name__} in {package.history_rst}: {node}"
-            )
+            raise ValueError(f"Unexpected node type {type(node).__name__} in {package.history_rst}: {node}")
         if isinstance(node, docutils.nodes.section):
             release_version = node[0].astext()
             current_date = None
@@ -532,6 +531,9 @@ def get_major_minor_version_strings(version: Version) -> Tuple[str, str]:
     # use "0" if minor version and/or point version was not specified
     if str(version) == str(version.major) or str(version) == major_galaxy_release_string:
         minor_galaxy_release_string = "0"
+    elif version.pre is not None and version.dev is None and version.post is None and not any(version.release[2:]):
+        # release candidates are written as e.g. VERSION_MINOR = "rc1"
+        minor_galaxy_release_string = f"{version.pre[0]}{version.pre[1]}"
     else:
         minor_galaxy_release_string = str(version).replace(f"{major_galaxy_release_string}.", "")
     return major_galaxy_release_string, minor_galaxy_release_string
@@ -679,11 +681,86 @@ def merge_and_resolve_branches(
         previous_package.write_history()
         subprocess.run(["git", "add", str(previous_package.history_rst)], cwd=galaxy_root)
         restore_version_files(galaxy_root, new_branch, previous_package.path)
+    resolve_uv_lock(galaxy_root, new_branch)
     # Commit changes
     if merge_conflict:
         subprocess.run(["git", "commit", "--no-edit"], cwd=galaxy_root).check_returncode()
     else:
         subprocess.run(["git", "commit", "--amend", "--no-edit"], cwd=galaxy_root).check_returncode()
+
+
+def uv_command(galaxy_root: Path) -> List[str]:
+    """Return the command that runs the uv version pinned in Galaxy's ``.tool-versions``."""
+    tool_versions = galaxy_root / ".tool-versions"
+    if tool_versions.is_file():
+        for line in tool_versions.read_text().splitlines():
+            fields = line.split()
+            if len(fields) >= 2 and fields[0] == "uv":
+                return ["uvx", f"uv@{fields[1]}"]
+    click.echo(f"Warning: no uv version pinned in {tool_versions}, using uv from PATH", err=True)
+    return ["uv"]
+
+
+def check_uv_available(galaxy_root: Path) -> None:
+    """Fail before changing anything if the uv workspace will need locking but uv cannot run."""
+    if (galaxy_root / "uv.lock").is_file() and shutil.which(uv_command(galaxy_root)[0]) is None:
+        raise click.ClickException(f"Cannot lock {galaxy_root / 'uv.lock'}, uv is not installed")
+
+
+def update_uv_lock(galaxy_root: Path, modified_paths: List[Path]) -> None:
+    """Re-lock the root uv workspace, whose ``uv.lock`` records every package version."""
+    uv_lock = galaxy_root / "uv.lock"
+    if not uv_lock.is_file():
+        return
+    cmd = uv_command(galaxy_root) + ["lock"]
+    click.echo(f"Running {' '.join(cmd)}")
+    subprocess.run(cmd, cwd=galaxy_root).check_returncode()
+    modified_paths.append(uv_lock)
+
+
+def resolve_uv_lock(galaxy_root: Path, new_branch: str) -> None:
+    """Resolve ``uv.lock`` during a merge into ``new_branch`` by locking the merged tree again.
+
+    Package versions differ between branches, so the lock files conflict on the
+    workspace members. Conflicting hunks are resolved in favour of ``new_branch``,
+    whose version files have already been restored, while changes that merge
+    cleanly, such as dependency updates, are kept.
+    """
+    uv_lock = galaxy_root / "uv.lock"
+    exists_in_new_branch = (
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{new_branch}:{uv_lock.relative_to(galaxy_root)}"],
+            cwd=galaxy_root,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+    if not exists_in_new_branch:
+        subprocess.run(["git", "rm", "-f", "--ignore-unmatch", str(uv_lock)], cwd=galaxy_root)
+        return
+    unmerged = subprocess.run(
+        ["git", "ls-files", "--unmerged", "--", str(uv_lock)], cwd=galaxy_root, capture_output=True, text=True
+    ).stdout
+    if unmerged:
+        stages = {int(line.split()[2]) for line in unmerged.splitlines()}
+        if stages == {1, 2, 3}:
+            with tempfile.TemporaryDirectory() as tmp:
+                for stage, name in ((1, "base"), (2, "ours"), (3, "theirs")):
+                    contents = subprocess.run(
+                        ["git", "show", f":{stage}:uv.lock"], cwd=galaxy_root, capture_output=True, check=True
+                    ).stdout
+                    Path(tmp, name).write_bytes(contents)
+                merged = subprocess.run(
+                    ["git", "merge-file", "-p", "--ours", "ours", "base", "theirs"],
+                    cwd=tmp,
+                    capture_output=True,
+                    check=True,
+                ).stdout
+            uv_lock.write_bytes(merged)
+        else:
+            subprocess.run(["git", "checkout", new_branch, str(uv_lock)], cwd=galaxy_root).check_returncode()
+    update_uv_lock(galaxy_root, [])
+    subprocess.run(["git", "add", str(uv_lock)], cwd=galaxy_root).check_returncode()
 
 
 def get_next_devN_version(galaxy_root) -> Version:
@@ -847,6 +924,7 @@ def create_point_release(
     repo: str,
 ):
     verify_galaxy_root(galaxy_root)
+    check_uv_available(galaxy_root)
     if upstream is None:
         upstream = f"git@github.com:{get_repo_name(owner, repo)}.git"
     check_galaxy_repo_is_clean(galaxy_root)
@@ -864,6 +942,7 @@ def create_point_release(
     commits_to_prs(packages, owner, repo)
     update_packages(packages, new_version, modified_paths)
     update_client_version(galaxy_root, new_version, modified_paths)
+    update_uv_lock(galaxy_root, modified_paths)
     run_build_packages(build_packages, packages)
     show_modified_paths_and_diff(galaxy_root, modified_paths, no_confirm)
     run_upload_packages(build_packages, upload_packages, no_confirm, packages)
@@ -877,6 +956,7 @@ def create_point_release(
     modified_paths = [version_py]
     update_packages(packages, dev_version, modified_paths, is_dev_version=True)
     update_client_version(galaxy_root, dev_version, modified_paths)
+    update_uv_lock(galaxy_root, modified_paths)
     commit_message = f"Start work on {dev_version}"
     stage_changes_and_commit(galaxy_root, dev_version, modified_paths, commit_message, no_confirm)
 

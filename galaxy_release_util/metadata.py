@@ -87,7 +87,9 @@ def _text_target(pull_request: PullRequestLike, skip_merge=True):
     is_some_kind_of_enhancement = is_enhancement or is_feature or is_small_enhancement
 
     if not (is_bug or is_some_kind_of_enhancement or is_minor or is_merge):
-        click.echo(f"No 'kind/*' or 'minor' or 'merge' or 'procedures' label found for {_pr_to_str(pull_request)}", err=True)
+        click.echo(
+            f"No 'kind/*' or 'minor' or 'merge' or 'procedures' label found for {_pr_to_str(pull_request)}", err=True
+        )
         text_target = None
 
     if (is_minor or is_merge) and skip_merge:

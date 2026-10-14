@@ -78,6 +78,16 @@ def test_get_major_minor_version_strings():
     assert major == "21.0"
     assert minor == "0"
 
+    version = Version("26.2rc1")
+    major, minor = get_major_minor_version_strings(version)
+    assert major == "26.2"
+    assert minor == "rc1"
+
+    version = Version("26.2.0rc1")
+    major, minor = get_major_minor_version_strings(version)
+    assert major == "26.2"
+    assert minor == "rc1"
+
 
 def test_no_module_level_github_client():
     """Verify that point_release module does not create a GitHub client at import time."""

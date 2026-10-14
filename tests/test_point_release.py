@@ -1,7 +1,22 @@
 import pathlib
+import subprocess
+from typing import List
 from unittest.mock import MagicMock, patch
 
+import click
 import pytest
+from click.testing import CliRunner
+from conftest import (
+    client_version,
+    commit_all,
+    git,
+    locked_version,
+    locked_versions,
+    package_versions,
+    root_version,
+    uv_lock,
+    write_versions,
+)
 from packaging.version import Version
 
 from galaxy_release_util import point_release
@@ -404,3 +419,120 @@ class TestCommitsToPrs:
             commits_to_prs([package])
 
         assert _text_target(next(iter(package.prs)), skip_merge=False) == "enhancement_tag_tools\n"
+
+
+class TestUvCommand:
+    def test_uses_uv_pinned_in_tool_versions(self, tmp_path):
+        (tmp_path / ".tool-versions").write_text("nodejs 22.0.0\nuv 0.12.23\n")
+        assert point_release.uv_command(tmp_path) == ["uvx", "uv@0.12.23"]
+
+    def test_falls_back_to_uv_on_path(self, tmp_path):
+        (tmp_path / ".tool-versions").write_text("nodejs 22.0.0\n")
+        assert point_release.uv_command(tmp_path) == ["uv"]
+        assert point_release.uv_command(tmp_path / "missing") == ["uv"]
+
+
+class TestUpdateUvLock:
+    def test_runs_pinned_uv(self, tmp_path, monkeypatch):
+        (tmp_path / ".tool-versions").write_text("uv 0.12.23\n")
+        (tmp_path / "uv.lock").write_text("")
+        calls = []
+        monkeypatch.setattr(
+            subprocess, "run", lambda cmd, cwd: calls.append((cmd, cwd)) or subprocess.CompletedProcess(cmd, 0)
+        )
+        modified_paths: List[pathlib.Path] = []
+
+        point_release.update_uv_lock(tmp_path, modified_paths)
+
+        assert calls == [(["uvx", "uv@0.12.23", "lock"], tmp_path)]
+        assert modified_paths == [tmp_path / "uv.lock"]
+
+    def test_skips_branches_without_uv_lock(self, tmp_path):
+        modified_paths: List[pathlib.Path] = []
+
+        point_release.update_uv_lock(tmp_path, modified_paths)
+
+        assert modified_paths == []
+
+    def test_missing_uv_is_reported_up_front(self, tmp_path, monkeypatch):
+        (tmp_path / "uv.lock").write_text("")
+        monkeypatch.setenv("PATH", str(tmp_path))
+
+        with pytest.raises(click.ClickException, match="uv is not installed"):
+            point_release.check_uv_available(tmp_path)
+
+
+class TestCreatePointRelease:
+    @pytest.fixture
+    def branched_clone(self, galaxy_clone):
+        """``release_26.2`` at 26.2.rc1, merged into ``dev`` at 27.0.dev0, both pushed upstream.
+
+        ``release_26.2`` then gains a ``uv.lock`` change that is not merged forward yet.
+        """
+        git(galaxy_clone, "checkout", "--quiet", "-b", "release_26.2")
+        write_versions(galaxy_clone, "26.2", "rc1", "26.2.0rc1", "26.2.0rc1")
+        uv_lock(galaxy_clone)
+        commit_all(galaxy_clone, "Update version to 26.2.rc1")
+        git(galaxy_clone, "checkout", "--quiet", "dev")
+        write_versions(galaxy_clone, "27.0", "dev0", "27.0.dev0", "27.0.dev0")
+        uv_lock(galaxy_clone)
+        commit_all(galaxy_clone, "Update version to 27.0.dev0")
+        git(
+            galaxy_clone,
+            "merge",
+            "--quiet",
+            "-X",
+            "ours",
+            "-m",
+            "Merge branch 'release_26.2' into 'dev'",
+            "release_26.2",
+        )
+        git(galaxy_clone, "checkout", "--quiet", "release_26.2")
+        subprocess.run(["uv", "lock", "--quiet", "--upgrade-package", "foo"], cwd=galaxy_clone, check=True)
+        commit_all(galaxy_clone, "Update foo to 1.1")
+        git(galaxy_clone, "push", "--quiet", "upstream", "dev", "release_26.2")
+        return galaxy_clone
+
+    def test_locks_and_merges_forward_without_root_package_json(self, branched_clone, upstream_repo):
+        args = [
+            "create-release",
+            "--galaxy-root",
+            str(branched_clone),
+            "--new-version",
+            "26.2.0",
+            "--last-commit",
+            "release_26.2",
+            "--no-build-packages",
+            "--upstream",
+            "upstream",
+            "--no-confirm",
+        ]
+        with patch("galaxy_release_util.point_release.github_client", return_value=MagicMock()):
+            result = CliRunner().invoke(point_release.cli, args)
+        assert result.exit_code == 0, result.output
+
+        release_versions = {"galaxy-util": "26.2.0", "galaxy-app": "26.2.0"}
+        assert root_version(branched_clone, "v26.2.0") == "26.2.0"
+        assert package_versions(branched_clone, "v26.2.0") == release_versions
+        assert locked_versions(branched_clone, "v26.2.0") == release_versions
+
+        dev_versions = {"galaxy-util": "26.2.1.dev0", "galaxy-app": "26.2.1.dev0"}
+        assert root_version(branched_clone, "release_26.2") == "26.2.1.dev0"
+        assert package_versions(branched_clone, "release_26.2") == dev_versions
+        assert locked_versions(branched_clone, "release_26.2") == dev_versions
+
+        # the uv.lock conflict is resolved by locking dev's versions again
+        next_versions = {"galaxy-util": "27.0.dev0", "galaxy-app": "27.0.dev0"}
+        assert root_version(branched_clone, "dev") == "27.0.dev0"
+        assert package_versions(branched_clone, "dev") == next_versions
+        assert locked_versions(branched_clone, "dev") == next_versions
+        assert client_version(branched_clone, "dev") == "27.0.dev0"
+        assert locked_version(branched_clone, "dev", "foo") == "1.1"
+        git(branched_clone, "merge-base", "--is-ancestor", "release_26.2", "dev")
+        assert git(branched_clone, "status", "--porcelain") == ""
+        git(branched_clone, "checkout", "--quiet", "dev")
+        subprocess.run(["uv", "lock", "--check"], cwd=branched_clone, check=True)
+        assert not (branched_clone / "package.json").exists()
+
+        for ref in ("dev", "release_26.2", "v26.2.0"):
+            assert git(upstream_repo, "rev-parse", ref) == git(branched_clone, "rev-parse", ref)
