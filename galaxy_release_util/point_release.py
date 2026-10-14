@@ -282,15 +282,16 @@ def get_sorted_package_paths(galaxy_root: Path) -> List[Path]:
     return [root_package_path.joinpath(p) for p in sorted_packages if p and not p.startswith("#")]
 
 
-def read_package(package_path: Path) -> Package:
-    version = None
+def read_package_version(package_path: Path) -> str:
     for filename in VERSION_FILENAMES:
         version = read_declared_version(package_path / filename)
         if version is not None:
-            break
-    if version is None:
-        raise ValueError(f"None of {', '.join(VERSION_FILENAMES)} in {package_path} contains a version line")
-    package = Package(path=package_path, current_version=version)
+            return version
+    raise ValueError(f"None of {', '.join(VERSION_FILENAMES)} in {package_path} contains a version line")
+
+
+def read_package(package_path: Path) -> Package:
+    package = Package(path=package_path, current_version=read_package_version(package_path))
     package.package_history = parse_changelog(package)
     return package
 
@@ -530,6 +531,9 @@ def get_major_minor_version_strings(version: Version) -> Tuple[str, str]:
     # use "0" if minor version and/or point version was not specified
     if str(version) == str(version.major) or str(version) == major_galaxy_release_string:
         minor_galaxy_release_string = "0"
+    elif version.pre is not None and version.dev is None and version.post is None and not any(version.release[2:]):
+        # release candidates are written as e.g. VERSION_MINOR = "rc1"
+        minor_galaxy_release_string = f"{version.pre[0]}{version.pre[1]}"
     else:
         minor_galaxy_release_string = str(version).replace(f"{major_galaxy_release_string}.", "")
     return major_galaxy_release_string, minor_galaxy_release_string
